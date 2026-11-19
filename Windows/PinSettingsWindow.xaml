@@ -1,0 +1,113 @@
+<Window x:Class="Vector.Windows.PinSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Vector · 贴图工具"
+        Width="460" Height="620"
+        MinWidth="430" MinHeight="590"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BgBrush}"
+        FontFamily="Segoe UI"
+        ResizeMode="NoResize">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Path Width="24" Height="24" Stretch="Uniform" Margin="0,0,10,0"
+                      Data="M 2,3 L 30,3 L 16,29 Z" Fill="#6366F1"/>
+                <TextBlock Text="贴图工具" Style="{StaticResource TitleText}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBlock Text="右键画框直接贴图，也可使用全局快捷键"
+                       Style="{StaticResource SubtitleText}" Margin="34,4,0,18"/>
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                Background="{DynamicResource SurfaceLightBrush}"
+                CornerRadius="12"
+                Padding="18">
+            <StackPanel>
+                <CheckBox x:Name="ChkEnabled"
+                          Content="启用手势与贴图"
+                          Foreground="{DynamicResource TextBrush}"
+                          FontWeight="SemiBold"
+                          Margin="0,0,0,14"/>
+                <CheckBox x:Name="ChkDrawTrace"
+                          Content="显示手势轨迹"
+                          Foreground="{DynamicResource TextBrush}"
+                          Margin="0,0,0,16"/>
+                <CheckBox x:Name="ChkCopyCaptureToClipboard"
+                          Content="截图后自动复制到剪贴板（默认关闭）"
+                          Foreground="{DynamicResource TextBrush}"
+                          Margin="0,0,0,16"/>
+
+                <TextBlock Text="框选贴图快捷键" Style="{StaticResource SmallText}" Margin="0,0,0,5"/>
+                <TextBox x:Name="TxtSnapshotKey"
+                         Style="{StaticResource ModernTextBox}"
+                         Height="38"
+                         PreviewKeyDown="Hotkey_PreviewKeyDown"/>
+
+                <TextBlock Text="剪贴板贴图快捷键" Style="{StaticResource SmallText}" Margin="0,13,0,5"/>
+                <TextBox x:Name="TxtClipboardKey"
+                         Style="{StaticResource ModernTextBox}"
+                         Height="38"
+                         PreviewKeyDown="Hotkey_PreviewKeyDown"/>
+
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="手势容错" Style="{StaticResource SmallText}"/>
+                        <Slider x:Name="SldSensitivity" Minimum="1" Maximum="100"
+                                TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,5,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="贴图透明度" Style="{StaticResource SmallText}"/>
+                        <Slider x:Name="SldAlpha" Minimum="0.25" Maximum="1"
+                                TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,20,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="立即框选"
+                            Style="{StaticResource SecondaryButton}" Height="36"
+                            Click="Snapshot_Click"/>
+                    <Button Grid.Column="2" Content="剪贴板贴图"
+                            Style="{StaticResource SecondaryButton}" Height="36"
+                            Click="Clipboard_Click"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="96"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="96"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="LblError"
+                       Foreground="{DynamicResource DangerBrush}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"/>
+            <Button Grid.Column="1" Content="取消"
+                    Style="{StaticResource SecondaryButton}" Height="36"
+                    Click="Cancel_Click"/>
+            <Button Grid.Column="3" Content="保存"
+                    Style="{StaticResource PrimaryButton}" Height="36"
+                    Click="Save_Click"/>
+        </Grid>
+    </Grid>
+</Window>

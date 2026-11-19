@@ -1,0 +1,17 @@
+# .NET build output
+bin/
+obj/
+
+# packaging / publish leftovers
+release/
+*.zip
+_pkg*/
+_zip_check/
+
+# Logs
+*.log
+
+# Rider / VS temp
+.vs/
+*.user
+

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Vector</AssemblyName>
+    <RootNamespace>Vector</RootNamespace>
+    <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <Version>2.0.2</Version>
+    <FileVersion>2.0.2.0</FileVersion>
+    <AssemblyVersion>2.0.2.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <!-- 资源文件 -->
+  <ItemGroup>
+    <Resource Include="Resources\app.ico"/>
+    <Resource Include="Resources\app_paused.ico"/>
+  </ItemGroup>
+
+  <!-- WPF 主框架 + 托盘图标用 WinForms NotifyIcon（仅 NotifyIcon，UI 全部 WPF） -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0"/>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0"/>
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0"/>
+  </ItemGroup>
+
+  <!-- tests/ 下是独立回归测试工程：必须从主工程的默认源文件通配里剔除，
+       否则 SDK 会把测试代码一起编进 Vector.exe（重复入口点 / 类型冲突）。 -->
+  <ItemGroup>
+    <Compile Remove="tests/**"/>
+    <None Remove="tests/**"/>
+    <Page Remove="tests/**"/>
+    <ApplicationDefinition Remove="tests/**"/>
+  </ItemGroup>
+
+</Project>

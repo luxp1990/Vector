@@ -1,0 +1,26 @@
+<Window x:Class="Vector.Windows.RegionSelectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        Cursor="Cross"
+        ClipToBounds="False"
+        KeyDown="OnKeyDown">
+    <Canvas x:Name="SelectionCanvas"
+            Background="#59000000"
+            ClipToBounds="False"
+            MouseLeftButtonDown="OnMouseLeftButtonDown"
+            MouseMove="OnMouseMove"
+            MouseLeftButtonUp="OnMouseLeftButtonUp">
+        <Rectangle x:Name="SelectionRectangle"
+                   Visibility="Collapsed"
+                   Stroke="#6366F1"
+                   StrokeThickness="2"
+                   Fill="#10FFFFFF"
+                   IsHitTestVisible="False"/>
+    </Canvas>
+</Window>

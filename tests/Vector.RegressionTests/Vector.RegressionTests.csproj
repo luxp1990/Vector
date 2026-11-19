@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Vector.RegressionTests</AssemblyName>
+    <RootNamespace>Vector.RegressionTests</RootNamespace>
+    <!-- 测试工程是控制台程序，没有 App.xaml，禁止 SDK 去找 ApplicationDefinition -->
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <!-- 断言全部基于「同一进程内自洽」的坐标（窗口矩形 vs GetSystemMetrics），
+         因此不需要与主程序共用 DPI 清单，避免清单里的执行级别设置干扰测试。 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Vector.csproj" />
+  </ItemGroup>
+
+</Project>
