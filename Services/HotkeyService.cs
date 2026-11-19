@@ -280,8 +280,22 @@ public class HotkeyService : IHotkeyService
         ReconcileLocals();
     }
 
+    private void SetDesiredShortcut(int id, ShortcutConfig cfg)
+    {
+        int index = id - 1;
+        while (_desiredShortcuts.Count <= index)
+            _desiredShortcuts.Add(cfg);
+        _desiredShortcuts[index] = cfg;
+    }
+
     public bool RegisterSingle(ShortcutConfig cfg, int id)
     {
+        if (id < 1)
+        {
+            Log($"Hotkey registration failed: invalid logicalId={id}", always: true);
+            return false;
+        }
+
         if (!ParseModifierKey(cfg.Key, out uint mods, out Keys key))
         {
             Log($"Hotkey parse failed: key={cfg.Key}", always: true);
@@ -290,13 +304,9 @@ public class HotkeyService : IHotkeyService
 
         string newSig = $"{mods:X2}:{(uint)key:X2}";
 
-        int index = id - 1;
-        while (_desiredShortcuts.Count <= index)
-            _desiredShortcuts.Add(cfg);
-        _desiredShortcuts[index] = cfg;
-
         if (_passthroughSignatures.Contains(newSig))
         {
+            SetDesiredShortcut(id, cfg);
             if (_logicalToActualId.TryGetValue(id, out int oldActId))
             {
                 Unregister(oldActId);
@@ -316,6 +326,7 @@ public class HotkeyService : IHotkeyService
             && TryGetHotkeySignature(currentCfg.Key, out string oldSignature)
             && oldSignature == newSig)
         {
+            SetDesiredShortcut(id, cfg);
             _hotkeyMap[currentId] = cfg;
             Log($"Hotkey mapping updated without re-registering: logicalId={id} key={cfg.Key}");
             return true;
@@ -325,6 +336,7 @@ public class HotkeyService : IHotkeyService
         if (!RegisterNative(actualId, mods, key, $"local:{cfg.Key}"))
             return false;
 
+        SetDesiredShortcut(id, cfg);
         _hotkeyMap[actualId] = cfg;
         _registeredIds.Add(actualId);
         if (oldActualId is int previousId)
