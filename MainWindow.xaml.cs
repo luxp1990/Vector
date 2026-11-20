@@ -895,10 +895,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            // ✅ 1.0.8: 失败时尝试恢复旧热键
-            if (oldKey != "None")
-                _hotkeyService.RegisterGlobal(oldKey);
-
             System.Windows.MessageBox.Show("热键注册失败，可能被其他程序占用。\n请尝试其他组合。",
                 "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
             TxtGlobalKey.Text = oldKey == "None" ? "" : oldKey;
@@ -1054,7 +1050,6 @@ public partial class MainWindow : Window
                     else
                         _originalOrder = null;
                 }
-                _hotkeyService.RegisterSingle(oldCfg, _editingIndex + 1);
                 System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} \u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
