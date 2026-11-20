@@ -610,7 +610,15 @@ public class HotkeyService : IHotkeyService
 
     private void Unregister(int id)
     {
-        try { UnregisterHotKey(_hwnd, id); } catch { }
+        try
+        {
+            if (!UnregisterHotKey(_hwnd, id))
+            {
+                int error = Marshal.GetLastWin32Error();
+                Log($"Hotkey unregistration failed: id={id} win32={error}", always: true);
+            }
+        }
+        catch { }
     }
 
     public string? GetHotkeyRejectReason(string keyStr)
@@ -635,6 +643,6 @@ public class HotkeyService : IHotkeyService
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 }
