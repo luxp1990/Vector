@@ -588,6 +588,55 @@ public partial class MainWindow : Window
 
         return null;
     }
+
+    private string? ValidateImportedSettings(AppSettings imported)
+    {
+        var entries = new List<(string Label, string Key)>();
+
+        if (imported.LocalShortcuts != null)
+        {
+            foreach (var shortcut in imported.LocalShortcuts)
+                entries.Add(("本地快捷键", shortcut?.Key ?? string.Empty));
+        }
+
+        if (!string.IsNullOrWhiteSpace(imported.GlobalHotKey)
+            && !string.Equals(imported.GlobalHotKey, "None", StringComparison.OrdinalIgnoreCase))
+        {
+            entries.Add(("全局开关热键", imported.GlobalHotKey));
+        }
+
+        PinSettings pin = imported.Pin ?? new PinSettings();
+        bool hasSnapshot = !string.IsNullOrWhiteSpace(pin.SnapshotHotkey);
+        bool hasClipboard = !string.IsNullOrWhiteSpace(pin.ClipboardHotkey);
+        if (hasSnapshot != hasClipboard)
+        {
+            string missingLabel = hasSnapshot ? "剪贴板贴图热键" : "贴图框选热键";
+            return $"贴图热键配置不完整：{missingLabel}为空";
+        }
+        if (hasSnapshot && hasClipboard)
+        {
+            entries.Add(("贴图框选热键", pin.SnapshotHotkey!));
+            entries.Add(("剪贴板贴图热键", pin.ClipboardHotkey!));
+        }
+
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (label, key) in entries)
+        {
+            if (!HotkeyService.TryGetHotkeySignature(key, out string signature))
+                return $"{label}「{key}」无效：快捷键格式无效";
+
+            string? rejectReason = _hotkeyService.GetHotkeyRejectReason(key);
+            if (rejectReason != null)
+                return $"{label}「{key}」无效：{rejectReason}";
+
+            if (seen.TryGetValue(signature, out string? existing))
+                return $"{label}「{key}」与{existing}冲突（组合键重复）";
+
+            seen[signature] = $"{label}「{key}」";
+        }
+
+        return null;
+    }
     private void InitTray()
     {
         _trayIcon = new Forms.NotifyIcon
@@ -1271,6 +1320,17 @@ public partial class MainWindow : Window
                 var imported = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
                 if (imported != null)
                 {
+                    string? validationError = ValidateImportedSettings(imported);
+                    if (validationError != null)
+                    {
+                        System.Windows.MessageBox.Show(
+                            $"配置导入已拒绝：{validationError}",
+                            "导入失败",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return;
+                    }
+
                     _hotkeyService.UnregisterAll();
                     _hotkeyService.UnregisterPinHotkeys();
                     // Bug 18: 先清除选中状态，避免引用断裂
