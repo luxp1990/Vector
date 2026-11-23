@@ -168,6 +168,12 @@ public partial class MainWindow : Window
         try
         {
             _settings = await _settingsService.LoadAsync();
+            _hotkeyService.LogInternalHotkeyConflicts(
+                _settings.LocalShortcuts,
+                _settings.GlobalHotKey,
+                _settings.Pin?.SnapshotHotkey,
+                _settings.Pin?.ClipboardHotkey,
+                "startup");
             // ✅ 1.0.8: 先检查注册，再赋值文本框（避免失败后 UI 与实际状态不一致）
             if (_settings.GlobalHotKey != "None" && !_hotkeyService.RegisterGlobal(_settings.GlobalHotKey))
             {
@@ -312,6 +318,13 @@ public partial class MainWindow : Window
         {
             // 关键修复：清除旧的已注册状态缓存，强制向操作系统重新发起 RegisterHotKey 系统调用
             _hotkeyService.ResetNativeRegistrations();
+
+            _hotkeyService.LogInternalHotkeyConflicts(
+                _settings.LocalShortcuts,
+                _settings.GlobalHotKey,
+                _settings.Pin?.SnapshotHotkey,
+                _settings.Pin?.ClipboardHotkey,
+                "resume");
 
             if (_settings.GlobalHotKey != "None")
                 _hotkeyService.RegisterGlobal(_settings.GlobalHotKey);
@@ -1774,6 +1787,12 @@ public partial class MainWindow : Window
         // ✅ 1. 写回 _settings.LocalShortcuts（直接换 ObservableCollection 实例，
         //    只触发一次 PropertyChanged + 一次 CollectionChanged，避免 Clear+Add×N 闪烁）
         _settings.LocalShortcuts = new ObservableCollection<ShortcutConfig>(entry.Snapshot);
+        _hotkeyService.LogInternalHotkeyConflicts(
+            _settings.LocalShortcuts,
+            _settings.GlobalHotKey,
+            _settings.Pin?.SnapshotHotkey,
+            _settings.Pin?.ClipboardHotkey,
+            "undo");
         // ✅ 修复：不再让 LocalShortcuts 与 _settings.LocalShortcuts 指向同一实例
         //    由 RefreshListView() 统一重建 UI 集合，彻底避免双写 / 引用合并问题
         // ✅ 3. 重注册所有热键（ID 重新映射为 1..N）+ 收集失败项 toast

@@ -644,6 +644,85 @@ public class HotkeyService : IHotkeyService
         return null; // 可用
     }
 
+    private static bool IsHotkeyUnset(string? keyStr)
+        => string.IsNullOrWhiteSpace(keyStr)
+           || string.Equals(keyStr.Trim(), "None", StringComparison.OrdinalIgnoreCase);
+
+    public int LogInternalHotkeyConflicts(
+        IEnumerable<ShortcutConfig> shortcuts,
+        string? globalKey,
+        string? snapshotKey,
+        string? clipboardKey,
+        string source)
+    {
+        int problems = 0;
+        var entries = new List<(string Label, string Key)>();
+
+        if (shortcuts != null)
+        {
+            int index = 0;
+            foreach (var shortcut in shortcuts)
+            {
+                index++;
+                if (shortcut == null || IsHotkeyUnset(shortcut.Key))
+                    continue;
+
+                string label = string.IsNullOrWhiteSpace(shortcut.Target)
+                    ? $"local#{index}"
+                    : $"local#{index}({shortcut.Target})";
+                entries.Add((label, shortcut.Key));
+            }
+        }
+
+        if (!IsHotkeyUnset(globalKey))
+            entries.Add(("global", globalKey!));
+
+        bool snapshotUnset = IsHotkeyUnset(snapshotKey);
+        bool clipboardUnset = IsHotkeyUnset(clipboardKey);
+        if (snapshotUnset != clipboardUnset)
+        {
+            string missingPin = snapshotUnset ? "pin-snapshot" : "pin-clipboard";
+            Log($"Config self-check ({source}): pin hotkey configuration is incomplete, missing {missingPin}", always: true);
+            problems++;
+        }
+
+        if (!snapshotUnset)
+            entries.Add(("pin-snapshot", snapshotKey!));
+        if (!clipboardUnset)
+            entries.Add(("pin-clipboard", clipboardKey!));
+
+        var seenSignatures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (label, key) in entries)
+        {
+            string? rejectReason = GetHotkeyRejectReason(key);
+            if (rejectReason != null)
+            {
+                Log($"Config self-check ({source}): [{label}] key '{key}' rejected: {rejectReason}", always: true);
+                problems++;
+                continue;
+            }
+
+            if (!TryGetHotkeySignature(key, out string signature))
+            {
+                Log($"Config self-check ({source}): [{label}] key '{key}' is invalid", always: true);
+                problems++;
+                continue;
+            }
+
+            if (seenSignatures.TryGetValue(signature, out string? existingLabel))
+            {
+                Log($"Config self-check ({source}): conflict between [{existingLabel}] and [{label}] on key '{key}' (signature {signature})", always: true);
+                problems++;
+            }
+            else
+            {
+                seenSignatures[signature] = label;
+            }
+        }
+
+        return problems;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 

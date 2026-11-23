@@ -45,4 +45,11 @@ public interface IHotkeyService
     /// 返回具体原因字符串表示被禁止（如 "系统保留快捷键"）。
     /// </summary>
     string? GetHotkeyRejectReason(string keyStr);
+
+    int LogInternalHotkeyConflicts(
+        IEnumerable<ShortcutConfig> shortcuts,
+        string? globalKey,
+        string? snapshotKey,
+        string? clipboardKey,
+        string source);
 }
