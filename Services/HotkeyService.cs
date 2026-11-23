@@ -43,8 +43,10 @@ public class HotkeyService : IHotkeyService
     private string _globalHotkeySignature = string.Empty;
     private int _pinSnapshotId;
     private int _pinClipboardId;
+    private int _pinToggleId;
     private string _pinSnapshotSignature = string.Empty;
     private string _pinClipboardSignature = string.Empty;
+    private string _pinToggleSignature = string.Empty;
     private readonly HashSet<string> _passthroughSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ShortcutConfig> _desiredShortcuts = new();
     private string? _desiredSnapshotKey;
@@ -108,7 +110,8 @@ public class HotkeyService : IHotkeyService
             if (!_registeredIds.Contains(candidate)
                 && candidate != _globalHotkeyId
                 && candidate != _pinSnapshotId
-                && candidate != _pinClipboardId)
+                && candidate != _pinClipboardId
+                && candidate != _pinToggleId)
                 return candidate;
         }
         throw new InvalidOperationException("No free hotkey IDs remain.");
@@ -151,6 +154,7 @@ public class HotkeyService : IHotkeyService
     public event Action? ToggleListening;
     public event Action<ShortcutConfig>? ExecuteShortcut;
     public event Action<PinHotkeyAction>? PinHotkeyTriggered;
+    public event Action? PinToggleHotkeyTriggered;
 
     public void Initialize(IntPtr hwnd)
     {
@@ -165,6 +169,11 @@ public class HotkeyService : IHotkeyService
         {
             Log("WM_HOTKEY dispatched to global toggle");
             ToggleListening?.Invoke();
+        }
+        else if (_pinToggleId != 0 && id == _pinToggleId)
+        {
+            Log("WM_HOTKEY dispatched to pin toggle");
+            PinToggleHotkeyTriggered?.Invoke();
         }
         else if (id == _pinSnapshotId && id != 0)
         {
@@ -242,6 +251,13 @@ public class HotkeyService : IHotkeyService
             Unregister(_globalHotkeyId);
             _globalHotkeyId = 0;
             _globalHotkeySignature = string.Empty;
+        }
+
+        if (_pinToggleId != 0)
+        {
+            Unregister(_pinToggleId);
+            _pinToggleId = 0;
+            _pinToggleSignature = string.Empty;
         }
 
         if (_pinSnapshotId != 0)
@@ -456,6 +472,46 @@ public class HotkeyService : IHotkeyService
         ReconcilePin();
     }
 
+    public bool RegisterPinToggleHotkey(string key)
+    {
+        if (IsHotkeyUnset(key))
+        {
+            UnregisterPinToggleHotkey();
+            return true;
+        }
+
+        string trimmed = key.Trim();
+        if (!ParseModifierKey(trimmed, out uint mods, out Keys vk))
+        {
+            Log($"Pin toggle hotkey parse failed: key={key}", always: true);
+            return false;
+        }
+        if (!TryGetHotkeySignature(trimmed, out string nextSignature))
+            return false;
+
+        if (_pinToggleId != 0 && nextSignature == _pinToggleSignature)
+            return true;
+
+        int replacementId = AllocateDynamicId();
+        if (!RegisterNative(replacementId, mods, vk, $"pin-toggle:{trimmed}"))
+            return false;
+
+        int oldId = _pinToggleId;
+        _pinToggleId = replacementId;
+        _pinToggleSignature = nextSignature;
+        if (oldId != 0)
+            Unregister(oldId);
+        return true;
+    }
+
+    public void UnregisterPinToggleHotkey()
+    {
+        if (_pinToggleId != 0)
+            Unregister(_pinToggleId);
+        _pinToggleId = 0;
+        _pinToggleSignature = string.Empty;
+    }
+
     private bool ReconcilePin()
     {
         if (!_pinDesired || string.IsNullOrWhiteSpace(_desiredSnapshotKey) || string.IsNullOrWhiteSpace(_desiredClipboardKey))
@@ -653,6 +709,7 @@ public class HotkeyService : IHotkeyService
         string? globalKey,
         string? snapshotKey,
         string? clipboardKey,
+        string? pinToggleKey,
         string source)
     {
         int problems = 0;
@@ -690,6 +747,8 @@ public class HotkeyService : IHotkeyService
             entries.Add(("pin-snapshot", snapshotKey!));
         if (!clipboardUnset)
             entries.Add(("pin-clipboard", clipboardKey!));
+        if (!IsHotkeyUnset(pinToggleKey))
+            entries.Add(("pin-toggle", pinToggleKey!));
 
         var seenSignatures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (label, key) in entries)
