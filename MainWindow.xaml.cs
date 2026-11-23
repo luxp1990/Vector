@@ -914,6 +914,17 @@ public partial class MainWindow : Window
             }
         }
     }
+    private string GetHotkeyRegisterFailureDetail(string genericDetail)
+    {
+        int errorCode = _hotkeyService.LastRegisterError;
+        return errorCode switch
+        {
+            0 => genericDetail,
+            1409 => "已被系统或其他程序占用（Win32 错误 1409）",
+            _ => $"注册失败（Win32 错误 {errorCode}）"
+        };
+    }
+
     private async void BtnSetGlobal_Click(object sender, RoutedEventArgs e)
     {
         string oldKey = _settings.GlobalHotKey;   // ✅ 1.0.8: 保存旧热键，失败时恢复
@@ -944,7 +955,14 @@ public partial class MainWindow : Window
         }
         else
         {
-            System.Windows.MessageBox.Show("热键注册失败，可能被其他程序占用。\n请尝试其他组合。",
+            int errorCode = _hotkeyService.LastRegisterError;
+            string message = errorCode switch
+            {
+                0 => "热键注册失败，可能被其他程序占用。\n请尝试其他组合。",
+                1409 => "热键注册失败，已被系统或其他程序占用（Win32 错误 1409）。\n请尝试其他组合。",
+                _ => $"热键注册失败（Win32 错误 {errorCode}）。\n请尝试其他组合。"
+            };
+            System.Windows.MessageBox.Show(message,
                 "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
             TxtGlobalKey.Text = oldKey == "None" ? "" : oldKey;
             TxtGlobalKey.Focus();
@@ -995,8 +1013,15 @@ public partial class MainWindow : Window
                 newSettings.SnapshotHotkey,
                 newSettings.ClipboardHotkey))
             {
+                int errorCode = _hotkeyService.LastRegisterError;
+                string message = errorCode switch
+                {
+                    0 => "贴图快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。",
+                    1409 => "贴图快捷键注册失败，已被系统或其他程序占用（Win32 错误 1409）。旧快捷键仍保持可用。",
+                    _ => $"贴图快捷键注册失败（Win32 错误 {errorCode}）。旧快捷键仍保持可用。"
+                };
                 System.Windows.MessageBox.Show(
-                    "贴图快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。",
+                    message,
                     "快捷键冲突",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -1099,7 +1124,7 @@ public partial class MainWindow : Window
                     else
                         _originalOrder = null;
                 }
-                System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} \u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
+                System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} {GetHotkeyRegisterFailureDetail("\u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528")}\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -1128,7 +1153,7 @@ public partial class MainWindow : Window
             {
                 _settings.LocalShortcuts.RemoveAt(_settings.LocalShortcuts.Count - 1);
                 _originalOrder?.Remove(cfg);
-                System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} \u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
+                System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} {GetHotkeyRegisterFailureDetail("\u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528")}\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
