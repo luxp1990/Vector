@@ -162,6 +162,7 @@ public partial class MainWindow : Window
                 _pinFeatureService.PinClipboard();
         }));
         _hotkeyService.PinHotkeyTriggered += _pinHotkeyHandler;
+        _hotkeyService.PinToggleHotkeyTriggered += OnPinToggleHotkeyTriggered;
         _pinFeatureService.NoticeRequested += OnPinNoticeRequested;
         // ✅ 1.0.1: 订阅脚本执行失败事件，弹气泡通知用户
         _executorService.ExecuteFailed += OnShortcutExecuteFailed;
@@ -173,6 +174,7 @@ public partial class MainWindow : Window
                 _settings.GlobalHotKey,
                 _settings.Pin?.SnapshotHotkey,
                 _settings.Pin?.ClipboardHotkey,
+                _settings.Pin?.ToggleHotkey,
                 "startup");
             // ✅ 1.0.8: 先检查注册，再赋值文本框（避免失败后 UI 与实际状态不一致）
             if (_settings.GlobalHotKey != "None" && !_hotkeyService.RegisterGlobal(_settings.GlobalHotKey))
@@ -245,11 +247,13 @@ public partial class MainWindow : Window
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         _hotkeyService.UnregisterAll();
         _hotkeyService.UnregisterPinHotkeys();
+        _hotkeyService.UnregisterPinToggleHotkey();
         _pinFeatureService.Shutdown();
         _hwndSource?.RemoveHook(WndProc);
         _hotkeyService.ToggleListening -= OnToggleListening;
         _hotkeyService.ExecuteShortcut -= _executeShortcutHandler;
         _hotkeyService.PinHotkeyTriggered -= _pinHotkeyHandler;
+        _hotkeyService.PinToggleHotkeyTriggered -= OnPinToggleHotkeyTriggered;
         _pinFeatureService.NoticeRequested -= OnPinNoticeRequested;
         _executorService.ExecuteFailed -= OnShortcutExecuteFailed;  // ✅ 1.0.1: 避免事件持有已关闭窗口
         if (_trayIcon != null)
@@ -276,6 +280,11 @@ public partial class MainWindow : Window
                     _settings.Pin.ClipboardHotkey))
             {
                 OnPinNoticeRequested("贴图快捷键注册失败，请在贴图设置中更换组合键");
+            }
+            if (!string.IsNullOrWhiteSpace(_settings.Pin.ToggleHotkey)
+                && !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey))
+            {
+                OnPinNoticeRequested("贴图开关快捷键注册失败，请在贴图设置中更换组合键");
             }
         }
         catch (Exception ex)
@@ -324,6 +333,7 @@ public partial class MainWindow : Window
                 _settings.GlobalHotKey,
                 _settings.Pin?.SnapshotHotkey,
                 _settings.Pin?.ClipboardHotkey,
+                _settings.Pin?.ToggleHotkey,
                 "resume");
 
             if (_settings.GlobalHotKey != "None")
@@ -346,6 +356,10 @@ public partial class MainWindow : Window
                     _settings.Pin.SnapshotHotkey,
                     _settings.Pin.ClipboardHotkey))
                 OnPinNoticeRequested("系统恢复后贴图快捷键重新注册失败");
+
+            if (!string.IsNullOrWhiteSpace(_settings.Pin?.ToggleHotkey)
+                && !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey))
+                OnPinNoticeRequested("系统恢复后贴图开关快捷键重新注册失败");
 
             // 恢复后立即强制刷新并与当前前台进程重新评估避让（即时检测，无需等待300ms轮询）
             _foregroundMonitor?.CheckForeground();
@@ -483,6 +497,22 @@ public partial class MainWindow : Window
         bool enable = sender == _togglePinItem
             ? !_settings.Pin.Enabled          // 托盘菜单点击：翻转当前状态
             : TglPin.IsChecked == true;       // 主界面开关点击
+        SetPinEnabled(enable);
+    }
+
+    private void OnPinToggleHotkeyTriggered()
+    {
+        if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
+            SetPinEnabled(!_settings.Pin.Enabled);
+        }));
+    }
+
+    private void SetPinEnabled(bool enable)
+    {
+        if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
         _suppressToggleSync = true;
         TglPin.IsChecked = enable;
         _suppressToggleSync = false;
@@ -598,6 +628,11 @@ public partial class MainWindow : Window
             && HotkeyService.TryGetHotkeySignature(pins.ClipboardHotkey, out string clipboard)
             && clipboard == signature)
             return "该组合键已被剪贴板贴图热键使用";
+        if (ignoredPinKey != "toggle"
+            && !string.IsNullOrWhiteSpace(pins.ToggleHotkey)
+            && HotkeyService.TryGetHotkeySignature(pins.ToggleHotkey, out string toggle)
+            && toggle == signature)
+            return "该组合键已被贴图开关热键使用";
 
         return null;
     }
@@ -630,6 +665,11 @@ public partial class MainWindow : Window
         {
             entries.Add(("贴图框选热键", pin.SnapshotHotkey!));
             entries.Add(("剪贴板贴图热键", pin.ClipboardHotkey!));
+        }
+        if (!string.IsNullOrWhiteSpace(pin.ToggleHotkey)
+            && !string.Equals(pin.ToggleHotkey.Trim(), "None", StringComparison.OrdinalIgnoreCase))
+        {
+            entries.Add(("贴图开关热键", pin.ToggleHotkey));
         }
 
         var seen = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1000,6 +1040,9 @@ public partial class MainWindow : Window
         PinSettings newSettings = dialog.ResultSettings;
         string? snapshotReject = _hotkeyService.GetHotkeyRejectReason(newSettings.SnapshotHotkey);
         string? clipboardReject = _hotkeyService.GetHotkeyRejectReason(newSettings.ClipboardHotkey);
+        string? toggleReject = string.IsNullOrWhiteSpace(newSettings.ToggleHotkey)
+            ? null
+            : _hotkeyService.GetHotkeyRejectReason(newSettings.ToggleHotkey);
         string? snapshotConflict = FindHotkeyConflict(
             newSettings.SnapshotHotkey,
             pinSettings: newSettings,
@@ -1008,11 +1051,39 @@ public partial class MainWindow : Window
             newSettings.ClipboardHotkey,
             pinSettings: newSettings,
             ignoredPinKey: "clipboard");
-        string? configurationConflict = snapshotReject ?? clipboardReject ?? snapshotConflict ?? clipboardConflict;
+        string? toggleConflict = string.IsNullOrWhiteSpace(newSettings.ToggleHotkey)
+            ? null
+            : FindHotkeyConflict(
+                newSettings.ToggleHotkey,
+                pinSettings: newSettings,
+                ignoredPinKey: "toggle");
+        string? configurationConflict = snapshotReject ?? clipboardReject ?? toggleReject
+            ?? snapshotConflict ?? clipboardConflict ?? toggleConflict;
         if (configurationConflict != null)
         {
             System.Windows.MessageBox.Show(configurationConflict, "快捷键冲突",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        bool toggleHotkeyChanged = !string.Equals(
+            oldSettings.ToggleHotkey?.Trim() ?? "",
+            newSettings.ToggleHotkey?.Trim() ?? "",
+            StringComparison.OrdinalIgnoreCase);
+        if (toggleHotkeyChanged && !_hotkeyService.RegisterPinToggleHotkey(newSettings.ToggleHotkey))
+        {
+            int errorCode = _hotkeyService.LastRegisterError;
+            string message = errorCode switch
+            {
+                0 => "贴图开关快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。",
+                1409 => "贴图开关快捷键注册失败，已被系统或其他程序占用（Win32 错误 1409）。旧快捷键仍保持可用。",
+                _ => $"贴图开关快捷键注册失败（Win32 错误 {errorCode}）。旧快捷键仍保持可用。"
+            };
+            System.Windows.MessageBox.Show(
+                message,
+                "快捷键冲突",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -1026,6 +1097,8 @@ public partial class MainWindow : Window
                 newSettings.SnapshotHotkey,
                 newSettings.ClipboardHotkey))
             {
+                if (toggleHotkeyChanged)
+                    _hotkeyService.RegisterPinToggleHotkey(oldSettings.ToggleHotkey ?? "");
                 int errorCode = _hotkeyService.LastRegisterError;
                 string message = errorCode switch
                 {
@@ -1366,6 +1439,7 @@ public partial class MainWindow : Window
 
                     _hotkeyService.UnregisterAll();
                     _hotkeyService.UnregisterPinHotkeys();
+                    _hotkeyService.UnregisterPinToggleHotkey();
                     // Bug 18: 先清除选中状态，避免引用断裂
                     LvShortcuts.SelectedIndex = -1;
                     _settings = imported;
@@ -1400,6 +1474,7 @@ public partial class MainWindow : Window
                         && !_hotkeyService.RegisterPinHotkeys(
                             _settings.Pin.SnapshotHotkey,
                             _settings.Pin.ClipboardHotkey);
+                    bool pinToggleFail = !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey);
                     _pinFeatureService.UpdateSettings(_settings.Pin);
                     _pinFeatureService.SetEnabled(_isPinActive);
                     _settings.Coexistence ??= new HotkeyCoexistenceSettings();
@@ -1415,7 +1490,7 @@ public partial class MainWindow : Window
                     TxtGlobalKey.Text = _settings.GlobalHotKey == "None" ? "" : _settings.GlobalHotKey;
                     TxtStartupDelay.Text = Math.Clamp(_settings.StartupDelaySeconds, 0, 120).ToString();
                     // ✅ 1.0.8: 合并为单一消息框，避免双重弹窗
-                    if (failedKeys.Count > 0 || globalHotkeyFail != null || pinHotkeyFail)
+                    if (failedKeys.Count > 0 || globalHotkeyFail != null || pinHotkeyFail || pinToggleFail)
                     {
                         var msg = "配置导入成功";
                         if (failedKeys.Count > 0)
@@ -1424,6 +1499,8 @@ public partial class MainWindow : Window
                             msg += $"\n全局热键 {globalHotkeyFail} 注册失败，可稍后在'全局开关'中重新设置";
                         if (pinHotkeyFail)
                             msg += "\n贴图快捷键注册失败，可稍后在“贴图工具”中重新设置";
+                        if (pinToggleFail)
+                            msg += "\n贴图开关快捷键注册失败，可稍后在“贴图工具”中重新设置";
                         System.Windows.MessageBox.Show(msg, "部分失败", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     else
@@ -1792,6 +1869,7 @@ public partial class MainWindow : Window
             _settings.GlobalHotKey,
             _settings.Pin?.SnapshotHotkey,
             _settings.Pin?.ClipboardHotkey,
+            _settings.Pin?.ToggleHotkey,
             "undo");
         // ✅ 修复：不再让 LocalShortcuts 与 _settings.LocalShortcuts 指向同一实例
         //    由 RefreshListView() 统一重建 UI 集合，彻底避免双写 / 引用合并问题

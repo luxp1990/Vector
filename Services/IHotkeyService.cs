@@ -15,6 +15,7 @@ public interface IHotkeyService
     event Action? ToggleListening;
     event Action<ShortcutConfig>? ExecuteShortcut;
     event Action<PinHotkeyAction>? PinHotkeyTriggered;
+    event Action? PinToggleHotkeyTriggered;
 
     void Initialize(IntPtr hwnd);
     void ProcessMessage(IntPtr wParam);
@@ -24,6 +25,8 @@ public interface IHotkeyService
     bool RegisterSingle(ShortcutConfig cfg, int id);
     bool RegisterPinHotkeys(string snapshotKey, string clipboardKey);
     void UnregisterPinHotkeys();
+    bool RegisterPinToggleHotkey(string key);
+    void UnregisterPinToggleHotkey();
     int LastRegisterError { get; }
     void SetDiagnosticLogging(bool enabled);
 
@@ -51,5 +54,6 @@ public interface IHotkeyService
         string? globalKey,
         string? snapshotKey,
         string? clipboardKey,
+        string? pinToggleKey,
         string source);
 }

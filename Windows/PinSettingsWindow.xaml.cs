@@ -21,6 +21,7 @@ public partial class PinSettingsWindow : Window
         ChkCopyCaptureToClipboard.IsChecked = settings.CopyCaptureToClipboard;
         TxtSnapshotKey.Text = settings.SnapshotHotkey;
         TxtClipboardKey.Text = settings.ClipboardHotkey;
+        TxtToggleKey.Text = settings.ToggleHotkey;
         SldSensitivity.Value = settings.Sensitive;
         SldAlpha.Value = settings.Alpha;
         ResultSettings = Clone(settings);
@@ -79,6 +80,7 @@ public partial class PinSettingsWindow : Window
     {
         string snapshot = TxtSnapshotKey.Text.Trim();
         string clipboard = TxtClipboardKey.Text.Trim();
+        string toggle = TxtToggleKey.Text.Trim();
         if (string.IsNullOrEmpty(snapshot) || string.IsNullOrEmpty(clipboard))
         {
             LblError.Text = "两个贴图快捷键都不能为空";
@@ -89,12 +91,20 @@ public partial class PinSettingsWindow : Window
             LblError.Text = "两个贴图快捷键不能相同";
             return;
         }
+        if (!string.IsNullOrEmpty(toggle)
+            && (string.Equals(toggle, snapshot, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(toggle, clipboard, StringComparison.OrdinalIgnoreCase)))
+        {
+            LblError.Text = "贴图开关快捷键不能与框选或剪贴板快捷键相同";
+            return;
+        }
 
         ResultSettings.Enabled = ChkEnabled.IsChecked == true;
         ResultSettings.DrawTrace = ChkDrawTrace.IsChecked == true;
         ResultSettings.CopyCaptureToClipboard = ChkCopyCaptureToClipboard.IsChecked == true;
         ResultSettings.SnapshotHotkey = snapshot;
         ResultSettings.ClipboardHotkey = clipboard;
+        ResultSettings.ToggleHotkey = toggle;
         ResultSettings.Sensitive = (int)Math.Round(SldSensitivity.Value);
         ResultSettings.Alpha = SldAlpha.Value;
         DialogResult = true;
@@ -118,6 +128,7 @@ public partial class PinSettingsWindow : Window
         TraceWidth = settings.TraceWidth,
         SnapshotHotkey = settings.SnapshotHotkey,
         ClipboardHotkey = settings.ClipboardHotkey,
+        ToggleHotkey = settings.ToggleHotkey,
         Alpha = settings.Alpha,
         MinAlpha = settings.MinAlpha,
         MaxAlpha = settings.MaxAlpha,
