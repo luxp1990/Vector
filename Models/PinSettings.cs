@@ -11,6 +11,7 @@ public sealed class PinSettings
     public double TraceWidth { get; set; } = 3;
     public string SnapshotHotkey { get; set; } = "Ctrl+Alt+A";
     public string ClipboardHotkey { get; set; } = "Ctrl+Alt+S";
+    public string ToggleHotkey { get; set; } = "";
     /// <summary>手势框图和屏幕框选成功后，是否复制截图到系统剪贴板。</summary>
     public bool CopyCaptureToClipboard { get; set; } = false;
     public double Alpha { get; set; } = 0.88;
