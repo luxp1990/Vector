@@ -24,6 +24,7 @@ public interface IHotkeyService
     bool RegisterSingle(ShortcutConfig cfg, int id);
     bool RegisterPinHotkeys(string snapshotKey, string clipboardKey);
     void UnregisterPinHotkeys();
+    int LastRegisterError { get; }
     void SetDiagnosticLogging(bool enabled);
 
     /// <summary>
