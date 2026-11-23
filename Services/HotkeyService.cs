@@ -81,15 +81,19 @@ public class HotkeyService : IHotkeyService
             System.Diagnostics.Debug.WriteLine(message);
     }
 
+    public int LastRegisterError { get; private set; }
+
     private bool RegisterNative(int id, uint modifiers, Keys key, string label)
     {
         if (RegisterHotKey(_hwnd, id, modifiers, (uint)key))
         {
+            LastRegisterError = 0;
             Log($"Hotkey registered: {label} id={id} chord={modifiers:X2}:{(uint)key:X2}");
             return true;
         }
 
         int error = Marshal.GetLastWin32Error();
+        LastRegisterError = error;
         Log($"Hotkey registration failed: {label} id={id} chord={modifiers:X2}:{(uint)key:X2} win32={error}", always: true);
         return false;
     }
