@@ -132,6 +132,7 @@
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextBrush}"/>
                         <TextBlock Text="临时暂停 / 恢复当前手动启用的功能（未设置则留空）"
+                                   TextWrapping="Wrap"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextMutedBrush}"
                                    Margin="0,2,0,12"/>
@@ -160,6 +161,7 @@
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextBrush}"/>
                         <TextBlock Text="可分别手动启用；全局开关热键临时暂停当前已启用功能"
+                                   TextWrapping="Wrap"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextMutedBrush}"
                                    Margin="0,2,0,12"/>
@@ -206,13 +208,14 @@
                                           Unchecked="TglPin_Changed"/>
                         </Grid>
                         <CheckBox x:Name="ChkHotkeyDiagnostics"
-                                  Content="热键诊断模式（排查时开启）"
                                   ToolTip="把热键注册、消息分发和目标启动过程记录到 Vector.log；默认关闭"
                                   Foreground="{DynamicResource TextMutedBrush}"
                                   FontSize="11"
                                   Margin="0,12,0,0"
                                   Checked="ChkHotkeyDiagnostics_Changed"
-                                  Unchecked="ChkHotkeyDiagnostics_Changed"/>
+                                  Unchecked="ChkHotkeyDiagnostics_Changed">
+                            <TextBlock Text="热键诊断模式（排查时开启）" TextWrapping="Wrap"/>
+                        </CheckBox>
                         <CheckBox x:Name="ChkHotkeyCoexistence"
                                   Content="智能避让前台冲突键"
                                   ToolTip="微信/QQ/浏览器/Excel等前台激活时，自动临时让渡冲突热键（如Alt+S、Ctrl+1~9），切走立即恢复"
