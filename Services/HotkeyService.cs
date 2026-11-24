@@ -550,6 +550,7 @@ public class HotkeyService : IHotkeyService
 
         bool snapshotPassthrough = _passthroughSignatures.Contains(snapshotSignature);
         bool clipboardPassthrough = _passthroughSignatures.Contains(clipboardSignature);
+        bool allRegistered = true;
 
         if (snapshotPassthrough)
         {
@@ -573,6 +574,10 @@ public class HotkeyService : IHotkeyService
                     _pinSnapshotId = newId;
                     _registeredIds.Add(newId);
                     _pinSnapshotSignature = snapshotSignature;
+                }
+                else
+                {
+                    allRegistered = false;
                 }
             }
         }
@@ -600,10 +605,14 @@ public class HotkeyService : IHotkeyService
                     _registeredIds.Add(newId);
                     _pinClipboardSignature = clipboardSignature;
                 }
+                else
+                {
+                    allRegistered = false;
+                }
             }
         }
 
-        return true;
+        return allRegistered;
     }
 
     // 注: Win 键组合在 Windows 上大部分被系统保留（如 Win+L 锁屏、Win+E 资源管理器），
