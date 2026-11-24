@@ -1186,9 +1186,9 @@ public partial class MainWindow : Window
             }
             // 取旧值（用于失败回滚 + Undo 描述）
             var oldCfg = _settings.LocalShortcuts[_editingIndex];
-            // ✅ Undo: 编辑前记录快照（此时列表仍是旧状态）
-            _undoService.Record(_settings.LocalShortcuts,
-                UndoOperationType.Update, $"编辑 {oldCfg.Key}");
+            // ✅ Undo: 先留一份编辑前的列表副本，注册成功后再 Record——
+            // 否则注册失败回滚后会留下一条幽灵撤销记录（Record 内部做深拷贝，传副本即可）
+            var preEditSnapshot = _settings.LocalShortcuts.ToList();
             _settings.LocalShortcuts[_editingIndex] = cfg;
             if (_originalOrder != null)
             {
@@ -1214,6 +1214,8 @@ public partial class MainWindow : Window
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+            _undoService.Record(preEditSnapshot,
+                UndoOperationType.Update, $"编辑 {oldCfg.Key}");
             // ✅ 1.0.8: 删除死代码 —— cfg 是新实例，IndexOf 用引用比较永远返回 -1
             // UI 同步由末尾的 RefreshListView() 统一处理
             _editingIndex = -1;
@@ -1228,9 +1230,8 @@ public partial class MainWindow : Window
                 System.Windows.MessageBox.Show("\u8BE5\u5FEB\u6377\u952E\u5DF2\u88AB\u5176\u4ED6\u9879\u4F7F\u7528\uFF01");
                 return;
             }
-// ✅ Undo: 添加前记录快照（此时列表还未包含新项）
-            _undoService.Record(_settings.LocalShortcuts,
-                UndoOperationType.Add, $"添加 {cfg.Key}");
+// ✅ Undo: 先留一份添加前的列表副本，注册成功后再 Record，避免注册失败留下幽灵撤销记录
+            var preAddSnapshot = _settings.LocalShortcuts.ToList();
             _settings.LocalShortcuts.Add(cfg);
             _originalOrder?.Add(cfg);
             // ✅ 修复：不再手动同步 LocalShortcuts，由末尾 RefreshListView() 统一刷新
@@ -1243,6 +1244,8 @@ public partial class MainWindow : Window
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+            _undoService.Record(preAddSnapshot,
+                UndoOperationType.Add, $"添加 {cfg.Key}");
         }
         // Bug 6: 删除冗余的 RegisterAll，RegisterSingle 已经完成了注册
         await _settingsService.SaveAsync(_settings);
@@ -1442,6 +1445,8 @@ public partial class MainWindow : Window
                     _hotkeyService.UnregisterPinToggleHotkey();
                     // Bug 18: 先清除选中状态，避免引用断裂
                     LvShortcuts.SelectedIndex = -1;
+                    // 导入会整体替换列表：残留的编辑索引会指向新列表的错误项（甚至越界），先退出编辑模式
+                    if (_editingIndex >= 0) BtnCancelEdit_Click(null!, null!);
                     _settings = imported;
                     _settings.LocalShortcuts ??= new System.Collections.ObjectModel.ObservableCollection<ShortcutConfig>();
                     _settings.Pin ??= new PinSettings();
@@ -1487,7 +1492,8 @@ public partial class MainWindow : Window
                     UpdateStatusUi();
                     _foregroundMonitor?.TriggerCurrent();
                     // Bug 18: 更新全局热键输入框（None → 空，勿假显示默认键）
-                    TxtGlobalKey.Text = _settings.GlobalHotKey == "None" ? "" : _settings.GlobalHotKey;
+                    // 全局键注册失败时运行时未生效，输入框同样显示空（配置字符串本身保留，见上方 1.0.7 注释）
+                    TxtGlobalKey.Text = globalHotkeyFail != null || _settings.GlobalHotKey == "None" ? "" : _settings.GlobalHotKey;
                     TxtStartupDelay.Text = Math.Clamp(_settings.StartupDelaySeconds, 0, 120).ToString();
                     // ✅ 1.0.8: 合并为单一消息框，避免双重弹窗
                     if (failedKeys.Count > 0 || globalHotkeyFail != null || pinHotkeyFail || pinToggleFail)
