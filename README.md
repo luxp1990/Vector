@@ -3,19 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 8.0](https://img.shields.io/badge/.NET-8.0--windows-purple.svg)](https://dotnet.microsoft.com/)
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows-0078D6.svg)](https://www.microsoft.com/windows)
-[![Release: 2.0.2](https://img.shields.io/badge/Release-v2.0.3-green.svg)](https://github.com/luxp1990/Vector/releases)
+[![Release: 2.0.2](https://img.shields.io/badge/Release-v2.0.2-green.svg)](https://github.com/luxp1990/Vector/releases)
 
 > 一个常驻系统托盘的 Windows 桌面工具：全局快捷键管理 + 手势贴图 + 快捷键贴图。
 > 技术栈：.NET 8 (WPF) + WinForms NotifyIcon，C#。
 
-作为一个每天都要和一堆文件、网页、软件打交道的社畜，桌面和任务栏总是被各种常用文件夹、网站和工具塞满；核对资料时，也经常需要把屏幕上的某段信息临时钉在最前面。**Vector** 就是为了解决这两个高频痛点而做的轻量级桌面工具：
-
-- **一键直达，告别任务栏拥挤**：不用再把常用入口全堆在任务栏或建一堆桌面快捷方式。只需把程序、文件、文件夹或快捷方式拖进软件，绑定一个顺手的快捷键，就能随时一键呼出。
-- **配置清晰，好找好改**：下方的快捷键清单直观展示所有绑定项，支持按类型排序、双击快速修改、右键删除，还支持 `Ctrl+Z` 撤销，不用担心记混或改错。
-- **智能防撞车，不抢前台热键**：内置前台应用冲突避让机制，切到微信、浏览器、Excel、IDE 或全屏软件时，会自动临时让渡常见冲突热键（也支持自定义排除名单），切走立刻恢复，互不打架。
-- **快速贴图，核对资料神器**：支持按住右键画框手势或快捷键快速把屏幕信息抠成置顶悬浮窗——**滚轮**调节透明度、**左键**按住拖拽位置、**右键**单击（或双击 / `Esc`）即可关闭。如需留存截图，也可在「贴图工具」设置中开启「截图后自动复制到剪贴板」，方便随时粘贴保存。
-
-欢迎大家下载试用，也欢迎提 Issue 或一起讨论改进！
 
 ---
 
@@ -129,8 +121,6 @@ Vector/
 
 ## 四、构建与运行
 
-> **免安装版**：到 [Releases](https://github.com/luxp1990/Vector/releases) 下载最新版 `Vector-v<版本>-win-x64.zip`，解压后双击 `Vector.exe` 即可运行——自包含 .NET 8 运行时，无需预装 .NET，仅支持 Windows x64。
-
 ```powershell
 # 还原依赖并编译（Debug / Release）
 dotnet build -c Release
@@ -173,12 +163,6 @@ python tests\run_all.py --no-build --exe release\Vector-2.0.1\Vector.exe
 
 ## 六、版本历史
 
-- **v2.0.3** (2026-11-25)
-  - 【热键注册健壮性】注册失败保留原有热键状态与期望状态；注册失败提示显示真实 Win32 错误码；注销失败写入日志。
-  - 【配置自检与导入校验】导入配置应用前先校验快捷键；启动、撤销、恢复注册前增加配置自检日志。
-  - 【贴图开关快捷键】新增可绑定的贴图功能开关热键，翻转贴图启用状态（与界面开关同一状态）。
-  - 【界面修复】修复全局设置卡片文字截断。
-  - 【审计修复】修复静态审计发现的 4 处缺陷（贴图注册结果、导入编辑状态、幽灵撤销、全局键显示）。
 - **v2.0.2** (2026-11-05)
   - 【多显示器跨屏手势轨迹完整显示】：放宽 Win32 `WM_GETMINMAXINFO` 限制，同步窗口与 Canvas 至虚拟桌面全域，修复多屏缝隙轨迹截断缺陷。
   - 【原位精准贴图】：框选或鼠标手势截图后，贴图窗口自动严丝合缝固定在截图原始矩形坐标。

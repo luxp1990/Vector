@@ -37,6 +37,8 @@ public class SettingsService : ISettingsService
                 settings.LocalShortcuts ??= new System.Collections.ObjectModel.ObservableCollection<ShortcutConfig>();
                 settings.Pin ??= new PinSettings();
                 settings.Coexistence ??= new HotkeyCoexistenceSettings();
+                if (string.IsNullOrWhiteSpace(settings.Language))
+                    settings.Language = "zh-CN";
                 settings.Version = Math.Max(settings.Version, 4);
                 return settings;
             }

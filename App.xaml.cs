@@ -46,6 +46,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ISettingsService>(_ => new SettingsService(dataDir));
                 services.AddSingleton<IHotkeyService, HotkeyService>();
                 services.AddSingleton<IThemeService, ThemeService>();
+                services.AddSingleton<ILanguageService, LanguageService>();
                 services.AddSingleton<IUndoService, UndoService>();
                 services.AddSingleton<IMouseGestureService, MouseGestureService>();
                 services.AddSingleton<ScreenCaptureService>();
