@@ -101,7 +101,7 @@ public class SettingsService : ISettingsService
     /// <summary>
     /// 切换便携模式：写/删标记并拷贝 config.json。返回提示文案；需重启后路径才切换。
     /// </summary>
-    public static string PreparePortableModeSwitch(bool enablePortable)
+    public static string PreparePortableModeSwitch(bool enablePortable, ILanguageService? languageService = null)
     {
         var exeDir = AppPaths.GetExeDirectory();
         var appData = AppPaths.GetAppDataDirectory();
@@ -119,7 +119,8 @@ public class SettingsService : ISettingsService
                 else if (!File.Exists(exeConfig))
                     File.WriteAllText(exeConfig, "{\n  \"Version\": 4,\n  \"LocalShortcuts\": [],\n  \"GlobalHotKey\": \"None\",\n  \"Theme\": \"Dark\",\n  \"RunAsAdmin\": false,\n  \"Pin\": {},\n  \"Coexistence\": {}\n}\n");
                 File.WriteAllText(marker, "portable=1\n");
-                return "已启用便携模式（配置将保存在程序目录）。请重启 Vector 后生效。";
+                return languageService?.GetString("Settings_Portable_Enabled")
+                    ?? "已启用便携模式（配置将保存在程序目录）。请重启 Vector 后生效。";
             }
 
             if (File.Exists(marker))
@@ -135,11 +136,13 @@ public class SettingsService : ISettingsService
                 File.Move(exeConfig, bak);
             }
 
-            return "已关闭便携模式（配置改用用户目录）。请重启 Vector 后生效。";
+            return languageService?.GetString("Settings_Portable_Disabled")
+                ?? "已关闭便携模式（配置改用用户目录）。请重启 Vector 后生效。";
         }
         catch (Exception ex)
         {
-            return $"切换失败：{ex.Message}";
+            return languageService?.Format("Settings_Portable_SwitchFailed_Format", ex.Message)
+                ?? $"切换失败：{ex.Message}";
         }
     }
 }

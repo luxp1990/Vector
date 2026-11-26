@@ -56,7 +56,8 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<IExecutorService>(sp =>
                     new ExecutorService(
                         sp.GetRequiredService<ISettingsService>(),
-                        sp.GetRequiredService<IFileTypeDetector>()));
+                        sp.GetRequiredService<IFileTypeDetector>(),
+                        sp.GetRequiredService<ILanguageService>()));
                 services.AddSingleton<MainWindow>();
             })
             .Build();

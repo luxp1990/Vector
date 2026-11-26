@@ -37,6 +37,7 @@ public class HotkeyService : IHotkeyService
     private readonly HashSet<int> _registeredIds = new();
     private readonly Dictionary<int, int> _logicalToActualId = new();
     private readonly ISettingsService? _settingsService;
+    private readonly ILanguageService? _languageService;
     private int _nextDynamicId = 10000;
     private volatile bool _diagnosticLogging;
     private int _globalHotkeyId;
@@ -57,9 +58,10 @@ public class HotkeyService : IHotkeyService
     {
     }
 
-    public HotkeyService(ISettingsService settingsService)
+    public HotkeyService(ISettingsService settingsService, ILanguageService? languageService = null)
     {
         _settingsService = settingsService;
+        _languageService = languageService;
     }
 
     public void SetDiagnosticLogging(bool enabled) => _diagnosticLogging = enabled;
@@ -692,19 +694,22 @@ public class HotkeyService : IHotkeyService
 
     public string? GetHotkeyRejectReason(string keyStr)
     {
-        if (string.IsNullOrWhiteSpace(keyStr)) return "快捷键不能为空";
+        if (string.IsNullOrWhiteSpace(keyStr))
+            return _languageService?.GetString("Hotkey_Reject_Empty") ?? "快捷键不能为空";
 
         // 先精确匹配黑名单
         if (ReservedKeys.Contains(keyStr))
-            return $"「{keyStr}」是系统保留快捷键，请选择其他组合";
+            return _languageService?.Format("Hotkey_Reject_Reserved_Format", keyStr)
+                ?? $"「{keyStr}」是系统保留快捷键，请选择其他组合";
 
         // 再做语义兼容：去掉两端的空格再匹配
         var trimmed = keyStr.Trim();
         if (ReservedKeys.Contains(trimmed))
-            return $"「{trimmed}」是系统保留快捷键，请选择其他组合";
+            return _languageService?.Format("Hotkey_Reject_Reserved_Format", trimmed)
+                ?? $"「{trimmed}」是系统保留快捷键，请选择其他组合";
 
         if (!TryGetHotkeySignature(trimmed, out _))
-            return "快捷键格式无效，请重新录入组合键";
+            return _languageService?.GetString("Hotkey_Reject_InvalidFormat") ?? "快捷键格式无效，请重新录入组合键";
 
         return null; // 可用
     }

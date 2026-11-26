@@ -47,6 +47,9 @@ public partial class MainWindow : Window
     private Forms.ContextMenuStrip? _menuTray;
     private Forms.ToolStripMenuItem? _toggleListenItem;
     private Forms.ToolStripMenuItem? _togglePinItem;        // 托盘"暂停截图"菜单项
+    private System.Windows.Controls.MenuItem? _miEdit;
+    private System.Windows.Controls.MenuItem? _miDelete;
+    private System.Windows.Controls.TextBlock? _headerTypeTextBlock;
     public ObservableCollection<ShortcutConfig> LocalShortcuts { get; private set; } = new();
 
     /// <summary>
@@ -84,7 +87,7 @@ public partial class MainWindow : Window
         DataContext = this;
         // 撤销栈状态变化时刷新按钮启用态
         _undoService.StateChanged += (_, _) => UpdateUndoButtonState();
-        _languageService.LanguageChanged += (_, _) => RefreshListView();
+        _languageService.LanguageChanged += OnLanguageChanged;
         UpdateUndoButtonState();
         var cm = new System.Windows.Controls.ContextMenu
         {
@@ -92,10 +95,10 @@ public partial class MainWindow : Window
             Foreground = (System.Windows.Media.Brush)FindResource("TextBrush"),
             BorderBrush = (System.Windows.Media.Brush)FindResource("BorderBrush"),
         };
-        var miEdit = new System.Windows.Controls.MenuItem { Header = "\u7F16\u8F91" };
-        var miDelete = new System.Windows.Controls.MenuItem { Header = "\u5220\u9664" };
-        cm.Items.Add(miEdit);
-        cm.Items.Add(miDelete);
+        _miEdit = new System.Windows.Controls.MenuItem { Header = _languageService.GetString("Common_Edit") };
+        _miDelete = new System.Windows.Controls.MenuItem { Header = _languageService.GetString("Common_Delete") };
+        cm.Items.Add(_miEdit);
+        cm.Items.Add(_miDelete);
         LvShortcuts.ContextMenu = cm;
         cm.Opened += (s, e) =>
         {
@@ -103,12 +106,12 @@ public partial class MainWindow : Window
                 && cm.PlacementTarget is System.Windows.Controls.ListViewItem lvi)
                 lvi.IsSelected = true;
         };
-        miEdit.Click += (s, e) =>
+        _miEdit.Click += (s, e) =>
         {
             var item = LvShortcuts.SelectedItem as ShortcutConfig;
             if (item != null) EnterEditMode(item);
         };
-        miDelete.Click += (s, e) =>
+        _miDelete.Click += (s, e) =>
         {
             if (LvShortcuts.SelectedItems.Count == 0) return;
             var selectedConfigs = LvShortcuts.SelectedItems
@@ -116,8 +119,8 @@ public partial class MainWindow : Window
                 .ToList();
             // ✅ Undo: 删除前记录快照（包含选中数与首个目标 key 的描述）
             var desc = selectedConfigs.Count == 1
-                ? $"删除 {selectedConfigs[0].Key}"
-                : $"删除 {selectedConfigs.Count} 项";
+                ? _languageService.Format("Undo_Desc_DeleteSingle", selectedConfigs[0].Key)
+                : _languageService.Format("Undo_Desc_DeleteMultiple", selectedConfigs.Count);
             _undoService.Record(_settings.LocalShortcuts, UndoOperationType.Delete, desc);
             _hotkeyService.UnregisterAll();
             foreach (var cfg in selectedConfigs)
@@ -131,15 +134,39 @@ public partial class MainWindow : Window
                 : new List<string>();
             if (failedKeys.Count > 0)
                 System.Windows.MessageBox.Show(
-                    $"以下快捷键注册失败（可能被占用）：\n{string.Join("\n", failedKeys)}",
-                    "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
+                    _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
             _ = _settingsService.SaveAsync(_settings);
-            LblCount.Text = $"{_settings.LocalShortcuts.Count} \u9879";
+            LblCount.Text = _languageService.Format("Main_Count_Format", _settings.LocalShortcuts.Count);
             LblEmptyHint.Visibility = LocalShortcuts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             // ✅ Bug N2: 删除后直接退出编辑模式，避免 _editingIndex 指向错误项目
             if (_editingIndex >= 0)
                 BtnCancelEdit_Click(null!, null!);
         };
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
+        RefreshListView();
+        if (_miEdit != null) _miEdit.Header = _languageService.GetString("Common_Edit");
+        if (_miDelete != null) _miDelete.Header = _languageService.GetString("Common_Delete");
+        if (_headerTypeTextBlock != null)
+        {
+            var typeHeader = _languageService.GetString("List_Header_Type");
+            _headerTypeTextBlock.Text = _sortByType == true ? $"{typeHeader} \u25B2" : typeHeader;
+        }
+        if (BtnAdd != null)
+            BtnAdd.Content = _editingIndex >= 0
+                ? _languageService.GetString("Common_Update")
+                : _languageService.GetString("AddCard_Add_Btn");
+        if (LblAdvancedTitle != null)
+            LblAdvancedTitle.Text = _advancedExpanded
+                ? _languageService.GetString("AddCard_Advanced_Expanded")
+                : _languageService.GetString("AddCard_Advanced_Title");
+        UpdateUndoButtonState();
+        RebuildTrayMenu();
+        UpdateStatusUi();
     }
     protected override async void OnSourceInitialized(EventArgs e)
     {
@@ -209,8 +236,8 @@ public partial class MainWindow : Window
                 : new List<string>();
             if (failedKeys.Count > 0)
                 System.Windows.MessageBox.Show(
-                    $"以下快捷键注册失败（可能被占用）：\n{string.Join("\n", failedKeys)}",
-                    "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
+                    _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
             // 应用持久化的主题与语言（必须在 RefreshListView 之前）
             _themeService.Apply(_settings.Theme != "Light");
             _languageService.Apply(_settings.Language);
@@ -218,7 +245,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"初始化失败: {ex.Message}", "错误",
+            System.Windows.MessageBox.Show(
+                _languageService.Format("Msg_InitFailed_Format", ex.Message),
+                _languageService.GetString("Common_Error"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
             _settings = new AppSettings();
             _languageService.Apply(_settings.Language);
@@ -236,11 +265,6 @@ public partial class MainWindow : Window
         // ✅ 休眠/解锁后重注册热键（RegisterHotKey 会话恢复后可能失效）
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
-        // ✅ 1.0.1: 如果当前已是提权进程，托盘提示文案加 "[管理员]" 后缀
-        if (IsUserAnAdmin())
-        {
-            _trayIcon!.Text = $"Vector - {CurrentStatusText()} [管理员]";
-        }
     }
     protected override void OnClosed(EventArgs e)
     {
@@ -252,6 +276,7 @@ public partial class MainWindow : Window
         }
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        _languageService.LanguageChanged -= OnLanguageChanged;
         _hotkeyService.UnregisterAll();
         _hotkeyService.UnregisterPinHotkeys();
         _hotkeyService.UnregisterPinToggleHotkey();
@@ -286,18 +311,18 @@ public partial class MainWindow : Window
                     _settings.Pin.SnapshotHotkey,
                     _settings.Pin.ClipboardHotkey))
             {
-                OnPinNoticeRequested("贴图快捷键注册失败，请在贴图设置中更换组合键");
+                OnPinNoticeRequested(_languageService.GetString("Msg_PinHotkeyRegisterFailed"));
             }
             if (!string.IsNullOrWhiteSpace(_settings.Pin.ToggleHotkey)
                 && !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey))
             {
-                OnPinNoticeRequested("贴图开关快捷键注册失败，请在贴图设置中更换组合键");
+                OnPinNoticeRequested(_languageService.GetString("Msg_PinToggleHotkeyRegisterFailed"));
             }
         }
         catch (Exception ex)
         {
             _ = _settingsService.LogAsync($"初始化贴图工具失败: {ex.Message}");
-            OnPinNoticeRequested("贴图工具初始化失败，详情已写入日志");
+            OnPinNoticeRequested(_languageService.GetString("Msg_PinInitFailed"));
         }
     }
 
@@ -305,12 +330,13 @@ public partial class MainWindow : Window
     {
         Dispatcher.BeginInvoke(new Action(() =>
         {
+            var title = _languageService.GetString("Pin_Window_Title");
             if (IsTrayIconValid)
-                _trayIcon!.ShowBalloonTip(2500, "Vector · 贴图工具", message, Forms.ToolTipIcon.Info);
+                _trayIcon!.ShowBalloonTip(2500, title, message, Forms.ToolTipIcon.Info);
             else
                 System.Windows.MessageBox.Show(
                     message,
-                    "Vector · 贴图工具",
+                    title,
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
         }));
@@ -352,8 +378,8 @@ public partial class MainWindow : Window
                 if (failed.Count > 0)
                 {
                     System.Windows.MessageBox.Show(
-                        $"系统恢复后以下快捷键重新注册失败（可能被占用）：\n{string.Join("\n", failed)}",
-                        "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        _languageService.Format("Msg_ResumeHotkeysRegisterFailed_Format", string.Join("\n", failed)),
+                        _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
 
@@ -362,11 +388,11 @@ public partial class MainWindow : Window
                 && !_hotkeyService.RegisterPinHotkeys(
                     _settings.Pin.SnapshotHotkey,
                     _settings.Pin.ClipboardHotkey))
-                OnPinNoticeRequested("系统恢复后贴图快捷键重新注册失败");
+                OnPinNoticeRequested(_languageService.GetString("Msg_ResumePinHotkeyFailed"));
 
             if (!string.IsNullOrWhiteSpace(_settings.Pin?.ToggleHotkey)
                 && !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey))
-                OnPinNoticeRequested("系统恢复后贴图开关快捷键重新注册失败");
+                OnPinNoticeRequested(_languageService.GetString("Msg_ResumePinToggleFailed"));
 
             // 恢复后立即强制刷新并与当前前台进程重新评估避让（即时检测，无需等待300ms轮询）
             _foregroundMonitor?.CheckForeground();
@@ -404,8 +430,8 @@ public partial class MainWindow : Window
             if (failedKeys.Count > 0)
             {
                 System.Windows.MessageBox.Show(
-                    $"以下快捷键注册失败（可能被占用）：\n{string.Join("\n", failedKeys)}",
-                    "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
+                    _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         else
@@ -426,7 +452,7 @@ public partial class MainWindow : Window
                     _settings.Pin.ClipboardHotkey)
                 && announceFailures)
             {
-                OnPinNoticeRequested("贴图快捷键注册失败，请在贴图设置中更换组合键");
+                OnPinNoticeRequested(_languageService.GetString("Msg_PinHotkeyRegisterFailed"));
             }
         }
         else
@@ -442,16 +468,26 @@ public partial class MainWindow : Window
     {
         bool hk = _isListening, pin = _isPinActive;
         bool manualHk = _settings.HotkeysEnabled, manualPin = _settings.Pin.Enabled;
-        if (hk && pin) return "监听中";
+        if (hk && pin) return _languageService.GetString("Status_Listening");
         if (!hk && !pin)
         {
-            if (!manualHk && !manualPin) return "全部功能已手动关闭";
-            if (manualHk && manualPin) return "已全部暂停";
-            return manualHk ? "快捷键已暂停" : "截图已暂停";
+            if (!manualHk && !manualPin) return _languageService.GetString("Status_AllDisabled");
+            if (manualHk && manualPin) return _languageService.GetString("Status_AllPaused");
+            return manualHk
+                ? _languageService.GetString("Status_HotkeysPaused")
+                : _languageService.GetString("Status_PinPaused");
         }
         return hk
-            ? (manualPin ? "截图已暂停" : "截图已手动关闭")
-            : (manualHk ? "快捷键已暂停" : "快捷键已手动关闭");
+            ? (manualPin ? _languageService.GetString("Status_PinPaused") : _languageService.GetString("Status_PinDisabled"))
+            : (manualHk ? _languageService.GetString("Status_HotkeysPaused") : _languageService.GetString("Status_HotkeysDisabled"));
+    }
+
+    private string FormatTrayText(string statusText)
+    {
+        var text = $"Vector - {statusText}";
+        if (IsUserAnAdmin())
+            text += _languageService.GetString("Tray_AdminSuffix");
+        return text;
     }
 
     /// <summary>刷新状态行、托盘图标与托盘菜单文本（功能开关的统一出口）。</summary>
@@ -468,7 +504,7 @@ public partial class MainWindow : Window
         StatusDot.Fill = brush;
         if (IsTrayIconValid)
         {
-            _trayIcon!.Text = $"Vector - {text}";
+            _trayIcon!.Text = FormatTrayText(text);
             var oldIcon = _trayIcon.Icon;
             _trayIcon.Icon = CreateAppIcon(paused: !hk && !pin);
             oldIcon?.Dispose();
@@ -478,11 +514,15 @@ public partial class MainWindow : Window
             bool anyManuallyEnabled = _settings.HotkeysEnabled || _settings.Pin.Enabled;
             _toggleListenItem.Enabled = anyManuallyEnabled;
             _toggleListenItem.Text = (hk || pin)
-                ? "暂停当前启用功能"
-                : anyManuallyEnabled ? "恢复当前启用功能" : "所有功能已手动关闭";
+                ? _languageService.GetString("Tray_Menu_PauseActive")
+                : anyManuallyEnabled
+                    ? _languageService.GetString("Tray_Menu_ResumeActive")
+                    : _languageService.GetString("Tray_Menu_AllDisabled");
         }
         if (_togglePinItem != null)
-            _togglePinItem.Text = _settings.Pin.Enabled ? "手动关闭截图" : "手动启用截图";
+            _togglePinItem.Text = _settings.Pin.Enabled
+                ? _languageService.GetString("Tray_Menu_DisablePin")
+                : _languageService.GetString("Tray_Menu_EnablePin");
     }
 
     private void TglHotkeys_Changed(object sender, RoutedEventArgs e)
@@ -622,7 +662,7 @@ public partial class MainWindow : Window
         string? ignoredPinKey = null)
     {
         if (!HotkeyService.TryGetHotkeySignature(key, out string signature))
-            return "快捷键格式无效";
+            return _languageService.GetString("Conflict_InvalidFormat");
 
         for (int i = 0; i < _settings.LocalShortcuts.Count; i++)
         {
@@ -630,7 +670,7 @@ public partial class MainWindow : Window
                 continue;
             if (HotkeyService.TryGetHotkeySignature(_settings.LocalShortcuts[i].Key, out string other)
                 && other == signature)
-                return $"该组合键已被本地快捷键「{_settings.LocalShortcuts[i].Key}」使用";
+                return _languageService.Format("Conflict_LocalUsed_Format", _settings.LocalShortcuts[i].Key);
         }
 
         if (!ignoreGlobal
@@ -638,22 +678,22 @@ public partial class MainWindow : Window
             && !string.Equals(_settings.GlobalHotKey, "None", StringComparison.OrdinalIgnoreCase)
             && HotkeyService.TryGetHotkeySignature(_settings.GlobalHotKey, out string global)
             && global == signature)
-            return "该组合键已被全局开关热键使用";
+            return _languageService.GetString("Conflict_GlobalUsed");
 
         PinSettings pins = pinSettings ?? _settings.Pin;
         if (ignoredPinKey != "snapshot"
             && HotkeyService.TryGetHotkeySignature(pins.SnapshotHotkey, out string snapshot)
             && snapshot == signature)
-            return "该组合键已被贴图框选热键使用";
+            return _languageService.GetString("Conflict_PinSnapshotUsed");
         if (ignoredPinKey != "clipboard"
             && HotkeyService.TryGetHotkeySignature(pins.ClipboardHotkey, out string clipboard)
             && clipboard == signature)
-            return "该组合键已被剪贴板贴图热键使用";
+            return _languageService.GetString("Conflict_PinClipboardUsed");
         if (ignoredPinKey != "toggle"
             && !string.IsNullOrWhiteSpace(pins.ToggleHotkey)
             && HotkeyService.TryGetHotkeySignature(pins.ToggleHotkey, out string toggle)
             && toggle == signature)
-            return "该组合键已被贴图开关热键使用";
+            return _languageService.GetString("Conflict_PinToggleUsed");
 
         return null;
     }
@@ -665,13 +705,13 @@ public partial class MainWindow : Window
         if (imported.LocalShortcuts != null)
         {
             foreach (var shortcut in imported.LocalShortcuts)
-                entries.Add(("本地快捷键", shortcut?.Key ?? string.Empty));
+                entries.Add((_languageService.GetString("Label_LocalShortcut"), shortcut?.Key ?? string.Empty));
         }
 
         if (!string.IsNullOrWhiteSpace(imported.GlobalHotKey)
             && !string.Equals(imported.GlobalHotKey, "None", StringComparison.OrdinalIgnoreCase))
         {
-            entries.Add(("全局开关热键", imported.GlobalHotKey));
+            entries.Add((_languageService.GetString("Label_GlobalHotkey"), imported.GlobalHotKey));
         }
 
         PinSettings pin = imported.Pin ?? new PinSettings();
@@ -679,34 +719,36 @@ public partial class MainWindow : Window
         bool hasClipboard = !string.IsNullOrWhiteSpace(pin.ClipboardHotkey);
         if (hasSnapshot != hasClipboard)
         {
-            string missingLabel = hasSnapshot ? "剪贴板贴图热键" : "贴图框选热键";
-            return $"贴图热键配置不完整：{missingLabel}为空";
+            string missingLabel = hasSnapshot
+                ? _languageService.GetString("Label_PinClipboardHotkey")
+                : _languageService.GetString("Label_PinSnapshotHotkey");
+            return _languageService.Format("Import_PinIncomplete_Format", missingLabel);
         }
         if (hasSnapshot && hasClipboard)
         {
-            entries.Add(("贴图框选热键", pin.SnapshotHotkey!));
-            entries.Add(("剪贴板贴图热键", pin.ClipboardHotkey!));
+            entries.Add((_languageService.GetString("Label_PinSnapshotHotkey"), pin.SnapshotHotkey!));
+            entries.Add((_languageService.GetString("Label_PinClipboardHotkey"), pin.ClipboardHotkey!));
         }
         if (!string.IsNullOrWhiteSpace(pin.ToggleHotkey)
             && !string.Equals(pin.ToggleHotkey.Trim(), "None", StringComparison.OrdinalIgnoreCase))
         {
-            entries.Add(("贴图开关热键", pin.ToggleHotkey));
+            entries.Add((_languageService.GetString("Label_PinToggleHotkey"), pin.ToggleHotkey));
         }
 
         var seen = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (label, key) in entries)
         {
             if (!HotkeyService.TryGetHotkeySignature(key, out string signature))
-                return $"{label}「{key}」无效：快捷键格式无效";
+                return _languageService.Format("Import_EntryInvalidFormat_Format", label, key);
 
             string? rejectReason = _hotkeyService.GetHotkeyRejectReason(key);
             if (rejectReason != null)
-                return $"{label}「{key}」无效：{rejectReason}";
+                return _languageService.Format("Import_EntryRejected_Format", label, key, rejectReason);
 
             if (seen.TryGetValue(signature, out string? existing))
-                return $"{label}「{key}」与{existing}冲突（组合键重复）";
+                return _languageService.Format("Import_EntryConflict_Format", label, key, existing);
 
-            seen[signature] = $"{label}「{key}」";
+            seen[signature] = _languageService.Format("Import_EntryLabel_Format", label, key);
         }
 
         return null;
@@ -717,38 +759,51 @@ public partial class MainWindow : Window
         {
             Icon = CreateAppIcon(),
             Visible = true,
-            Text = "Vector - \u76D1\u542C\u4E2D",
+            Text = FormatTrayText(CurrentStatusText()),
         };
         _menuTray = new Forms.ContextMenuStrip();
+        RebuildTrayMenu();
+        _trayIcon.ContextMenuStrip = _menuTray;
+        _trayIcon.DoubleClick += (s, ev) => { Show(); WindowState = WindowState.Normal; Activate(); };
+    }
+
+    private void RebuildTrayMenu()
+    {
+        if (_menuTray == null) return;
+        _menuTray.Items.Clear();
         var menu = _menuTray;
-        menu.Items.Add("\u663E\u793A", null, (s, ev) => { Show(); WindowState = WindowState.Normal; Activate(); });
-        menu.Items.Add("框选贴图", null, (s, ev) =>
+        menu.Items.Add(_languageService.GetString("Tray_Menu_Show"), null, (s, ev) => { Show(); WindowState = WindowState.Normal; Activate(); });
+        menu.Items.Add(_languageService.GetString("Tray_Menu_RegionCapture"), null, (s, ev) =>
             Dispatcher.BeginInvoke(new Action(_pinFeatureService.StartRegionCapture)));
-        menu.Items.Add("剪贴板贴图", null, (s, ev) =>
+        menu.Items.Add(_languageService.GetString("Tray_Menu_ClipboardPin"), null, (s, ev) =>
             Dispatcher.BeginInvoke(new Action(_pinFeatureService.PinClipboard)));
-        menu.Items.Add("贴图设置", null, (s, ev) =>
+        menu.Items.Add(_languageService.GetString("Tray_Menu_PinSettings"), null, (s, ev) =>
             Dispatcher.BeginInvoke(new Action(OpenPinSettings)));
         menu.Items.Add(new Forms.ToolStripSeparator());
 
         // 暂停/恢复快捷键菜单项
         _toggleListenItem = new Forms.ToolStripMenuItem(
-            (_isListening || _isPinActive) ? "暂停当前启用功能" : "恢复当前启用功能");
+            (_isListening || _isPinActive)
+                ? _languageService.GetString("Tray_Menu_PauseActive")
+                : _languageService.GetString("Tray_Menu_ResumeActive"));
         _toggleListenItem.Click += (s, ev) => OnToggleListening();
         menu.Items.Add(_toggleListenItem);
 
         // 暂停/恢复截图菜单项（与主界面截图开关同步）
         _togglePinItem = new Forms.ToolStripMenuItem(
-            _settings.Pin.Enabled ? "手动关闭截图" : "手动启用截图");
+            _settings.Pin.Enabled
+                ? _languageService.GetString("Tray_Menu_DisablePin")
+                : _languageService.GetString("Tray_Menu_EnablePin"));
         _togglePinItem.Click += (s, ev) =>
             Dispatcher.BeginInvoke(new Action(() => TglPin_Changed(_togglePinItem!, new RoutedEventArgs())));
         menu.Items.Add(_togglePinItem);
 
-        var reregisterItem = new Forms.ToolStripMenuItem("立即重新注册热键");
+        var reregisterItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_ReregisterHotkeys"));
         reregisterItem.Click += (s, ev) => ReregisterHotkeysAfterResume();
         menu.Items.Add(reregisterItem);
 
         menu.Items.Add(new Forms.ToolStripSeparator());
-        var themeItem = new Forms.ToolStripMenuItem("\u5207\u6362\u6DF1/\u6D45\u8272\u6A21\u5F0F");
+        var themeItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_ToggleTheme"));
         themeItem.Click += async (s, ev) =>
         {
             _themeService.Toggle();
@@ -757,7 +812,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(themeItem);
         // ✅ 开机自启
-        var autoStartItem = new Forms.ToolStripMenuItem("开机启动")
+        var autoStartItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_AutoStart"))
         {
             Checked = AutoStartService.IsEnabled(),
             CheckOnClick = true
@@ -770,14 +825,16 @@ public partial class MainWindow : Window
                 _trayCheckSuppress = true;
                 autoStartItem.Checked = AutoStartService.IsEnabled();
                 _trayCheckSuppress = false;
-                System.Windows.MessageBox.Show("无法修改开机启动项（可能权限不足）。", "开机启动",
+                System.Windows.MessageBox.Show(
+                    _languageService.GetString("Msg_AutoStartFailed"),
+                    _languageService.GetString("Tray_Menu_AutoStart"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
         menu.Items.Add(autoStartItem);
 
         // ✅ 便携换机：配置写在程序目录
-        var portableItem = new Forms.ToolStripMenuItem("配置保存在程序目录（便携换机）")
+        var portableItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_Portable"))
         {
             Checked = AppPaths.IsPortableMode(),
             CheckOnClick = true
@@ -787,7 +844,7 @@ public partial class MainWindow : Window
             if (_trayCheckSuppress) return;
             // 先落盘现行目录，再拷到目标，避免启用便携后重启丢最近改动
             await _settingsService.SaveAsync(_settings);
-            var msg = SettingsService.PreparePortableModeSwitch(portableItem.Checked);
+            var msg = SettingsService.PreparePortableModeSwitch(portableItem.Checked, _languageService);
             var actual = AppPaths.IsPortableMode();
             if (portableItem.Checked != actual)
             {
@@ -795,11 +852,11 @@ public partial class MainWindow : Window
                 portableItem.Checked = actual;
                 _trayCheckSuppress = false;
             }
-            System.Windows.MessageBox.Show(msg, "便携配置", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(msg, _languageService.GetString("Msg_PortableTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
         };
         menu.Items.Add(portableItem);
 
-        var openCfgItem = new Forms.ToolStripMenuItem("打开配置文件夹");
+        var openCfgItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_OpenConfigFolder"));
         openCfgItem.Click += (s, ev) =>
         {
             try
@@ -815,14 +872,16 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"无法打开：{ex.Message}", "错误",
+                System.Windows.MessageBox.Show(
+                    _languageService.Format("Msg_OpenFolderFailed_Format", ex.Message),
+                    _languageService.GetString("Common_Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         };
         menu.Items.Add(openCfgItem);
 
         // ✅ 1.0.1: UIPI 缓解入口 — 托盘菜单提供"以管理员模式启动"开关
-        var adminItem = new Forms.ToolStripMenuItem("\u4EE5\u7BA1\u7406\u5458\u6A21\u5F0F\u542F\u52A8")
+        var adminItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_RunAsAdmin"))
         {
             Checked = _settings.RunAsAdmin,
             CheckOnClick = true
@@ -834,8 +893,8 @@ public partial class MainWindow : Window
             if (adminItem.Checked && !IsUserAnAdmin())
             {
                 var result = System.Windows.MessageBox.Show(
-                    "需要以管理员身份重启 Vector 才能让全局热键穿透到高权限程序（如全屏游戏）。\n\n是否立即重启？",
-                    "UIPI 提权", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    _languageService.GetString("Msg_AdminRestartPrompt"),
+                    _languageService.GetString("Msg_AdminRestartTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                 {
                     RestartAsAdmin();
@@ -844,14 +903,12 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(adminItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("\u9000\u51FA", null, (s, ev) =>
+        menu.Items.Add(_languageService.GetString("Tray_Menu_Exit"), null, (s, ev) =>
         {
             _reallyExit = true;   // Bug 11: 标记真正退出
             _trayIcon!.Visible = false;
             System.Windows.Application.Current.Shutdown();
         });
-        _trayIcon.ContextMenuStrip = menu;
-        _trayIcon.DoubleClick += (s, ev) => { Show(); WindowState = WindowState.Normal; Activate(); };
     }
     // ✅ 1.0.1: 以管理员身份重启 Vector
     public void RestartAsAdmin()
@@ -861,7 +918,9 @@ public partial class MainWindow : Window
             var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
             if (string.IsNullOrEmpty(exePath))
             {
-                System.Windows.MessageBox.Show("无法获取程序路径，请手动重启。", "错误",
+                System.Windows.MessageBox.Show(
+                    _languageService.GetString("Msg_ExePathNotFound"),
+                    _languageService.GetString("Common_Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -881,8 +940,8 @@ public partial class MainWindow : Window
             if (newProc == null)
             {
                 System.Windows.MessageBox.Show(
-                    "启动提权进程失败（可能被系统拒绝或用户取消 UAC）。当前进程继续运行，请稍后重试。",
-                    "提权失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _languageService.GetString("Msg_ElevationFailed"),
+                    _languageService.GetString("Msg_ElevationFailedTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -894,12 +953,15 @@ public partial class MainWindow : Window
         catch (System.ComponentModel.Win32Exception)
         {
             // 用户取消了 UAC 弹窗
-            System.Windows.MessageBox.Show("已取消管理员重启。当前进程仍以普通权限运行，全局热键可能无法在管理员程序中触发。",
-                "已取消", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(
+                _languageService.GetString("Msg_ElevationCancelled"),
+                _languageService.GetString("Common_Cancelled"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"重启失败: {ex.Message}", "错误",
+            System.Windows.MessageBox.Show(
+                _languageService.Format("Msg_RestartFailed_Format", ex.Message),
+                _languageService.GetString("Common_Error"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -968,7 +1030,7 @@ public partial class MainWindow : Window
             // 与关闭进托盘一致：气泡只提示一次
             if (IsTrayIconValid && !_hasShownMinimizeTip)
             {
-                _trayIcon!.ShowBalloonTip(1000, "Vector", "\u5DF2\u6700\u5C0F\u5316\u5230\u6258\u76D8", Forms.ToolTipIcon.Info);
+                _trayIcon!.ShowBalloonTip(1000, "Vector", _languageService.GetString("Tray_Minimized_Tip"), Forms.ToolTipIcon.Info);
                 _hasShownMinimizeTip = true;
             }
         }
@@ -983,7 +1045,7 @@ public partial class MainWindow : Window
             // ✅ Bug N4: 气泡只弹第一次，之后不再骚扰
             if (IsTrayIconValid && !_hasShownMinimizeTip)
             {
-                _trayIcon!.ShowBalloonTip(1000, "Vector", "\u5DF2\u6700\u5C0F\u5316\u5230\u6258\u76D8", Forms.ToolTipIcon.Info);
+                _trayIcon!.ShowBalloonTip(1000, "Vector", _languageService.GetString("Tray_Minimized_Tip"), Forms.ToolTipIcon.Info);
                 _hasShownMinimizeTip = true;
             }
         }
@@ -994,8 +1056,8 @@ public partial class MainWindow : Window
         return errorCode switch
         {
             0 => genericDetail,
-            1409 => "已被系统或其他程序占用（Win32 错误 1409）",
-            _ => $"注册失败（Win32 错误 {errorCode}）"
+            1409 => _languageService.GetString("Msg_HotkeyOccupied_1409"),
+            _ => _languageService.Format("Msg_HotkeyOccupied_Code_Format", errorCode)
         };
     }
 
@@ -1012,7 +1074,7 @@ public partial class MainWindow : Window
             string? conflict = FindHotkeyConflict(newKey, ignoreGlobal: true);
             if (rejectReason != null || conflict != null)
             {
-                System.Windows.MessageBox.Show(rejectReason ?? conflict!, "快捷键冲突",
+                System.Windows.MessageBox.Show(rejectReason ?? conflict!, _languageService.GetString("Msg_HotkeyConflictTitle"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 TxtGlobalKey.Text = oldKey == "None" ? "" : oldKey;
                 return;
@@ -1024,20 +1086,22 @@ public partial class MainWindow : Window
             await _settingsService.SaveAsync(_settings);
             TxtGlobalKey.Text = newKey == "None" ? "" : newKey;
             System.Windows.MessageBox.Show(
-                newKey == "None" ? "已关闭全局开关热键" : "全局热键已保存",
-                "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                newKey == "None"
+                    ? _languageService.GetString("Msg_GlobalHotkeyDisabled")
+                    : _languageService.GetString("Msg_GlobalHotkeySaved"),
+                _languageService.GetString("Common_Success"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         else
         {
             int errorCode = _hotkeyService.LastRegisterError;
             string message = errorCode switch
             {
-                0 => "热键注册失败，可能被其他程序占用。\n请尝试其他组合。",
-                1409 => "热键注册失败，已被系统或其他程序占用（Win32 错误 1409）。\n请尝试其他组合。",
-                _ => $"热键注册失败（Win32 错误 {errorCode}）。\n请尝试其他组合。"
+                0 => _languageService.GetString("Msg_GlobalRegisterFailed_Generic"),
+                1409 => _languageService.GetString("Msg_GlobalRegisterFailed_1409"),
+                _ => _languageService.Format("Msg_GlobalRegisterFailed_Code_Format", errorCode)
             };
             System.Windows.MessageBox.Show(message,
-                "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _languageService.GetString("Common_Error"), MessageBoxButton.OK, MessageBoxImage.Warning);
             TxtGlobalKey.Text = oldKey == "None" ? "" : oldKey;
             TxtGlobalKey.Focus();
         }
@@ -1050,7 +1114,8 @@ public partial class MainWindow : Window
         var dialog = new PinSettingsWindow(
             _settings.Pin,
             _pinFeatureService.StartRegionCapture,
-            _pinFeatureService.PinClipboard)
+            _pinFeatureService.PinClipboard,
+            _languageService)
         {
             Owner = this
         };
@@ -1082,7 +1147,7 @@ public partial class MainWindow : Window
             ?? snapshotConflict ?? clipboardConflict ?? toggleConflict;
         if (configurationConflict != null)
         {
-            System.Windows.MessageBox.Show(configurationConflict, "快捷键冲突",
+            System.Windows.MessageBox.Show(configurationConflict, _languageService.GetString("Msg_HotkeyConflictTitle"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -1096,13 +1161,13 @@ public partial class MainWindow : Window
             int errorCode = _hotkeyService.LastRegisterError;
             string message = errorCode switch
             {
-                0 => "贴图开关快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。",
-                1409 => "贴图开关快捷键注册失败，已被系统或其他程序占用（Win32 错误 1409）。旧快捷键仍保持可用。",
-                _ => $"贴图开关快捷键注册失败（Win32 错误 {errorCode}）。旧快捷键仍保持可用。"
+                0 => _languageService.GetString("Msg_PinToggleRegisterFailed_Generic"),
+                1409 => _languageService.GetString("Msg_PinToggleRegisterFailed_1409"),
+                _ => _languageService.Format("Msg_PinToggleRegisterFailed_Code_Format", errorCode)
             };
             System.Windows.MessageBox.Show(
                 message,
-                "快捷键冲突",
+                _languageService.GetString("Msg_HotkeyConflictTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
@@ -1123,13 +1188,13 @@ public partial class MainWindow : Window
                 int errorCode = _hotkeyService.LastRegisterError;
                 string message = errorCode switch
                 {
-                    0 => "贴图快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。",
-                    1409 => "贴图快捷键注册失败，已被系统或其他程序占用（Win32 错误 1409）。旧快捷键仍保持可用。",
-                    _ => $"贴图快捷键注册失败（Win32 错误 {errorCode}）。旧快捷键仍保持可用。"
+                    0 => _languageService.GetString("Msg_PinHotkeysRegisterFailed_Generic"),
+                    1409 => _languageService.GetString("Msg_PinHotkeysRegisterFailed_1409"),
+                    _ => _languageService.Format("Msg_PinHotkeysRegisterFailed_Code_Format", errorCode)
                 };
                 System.Windows.MessageBox.Show(
                     message,
-                    "快捷键冲突",
+                    _languageService.GetString("Msg_HotkeyConflictTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -1149,7 +1214,7 @@ public partial class MainWindow : Window
         _suppressToggleSync = false;
         UpdateStatusUi();
         await _settingsService.SaveAsync(_settings);
-        OnPinNoticeRequested("贴图设置已保存并立即生效");
+        OnPinNoticeRequested(_languageService.GetString("Msg_PinSettingsSaved"));
     }
 
     private async void BtnAdd_Click(object sender, RoutedEventArgs e)
@@ -1170,7 +1235,7 @@ public partial class MainWindow : Window
             var rejectReason = _hotkeyService.GetHotkeyRejectReason(enteringKey);
             if (rejectReason != null)
             {
-                System.Windows.MessageBox.Show(rejectReason, "快捷键不可用",
+                System.Windows.MessageBox.Show(rejectReason, _languageService.GetString("Msg_HotkeyUnavailableTitle"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -1180,7 +1245,7 @@ public partial class MainWindow : Window
             ignoredLocalIndex: _editingIndex >= 0 ? _editingIndex : null);
         if (internalConflict != null)
         {
-            System.Windows.MessageBox.Show(internalConflict, "快捷键冲突",
+            System.Windows.MessageBox.Show(internalConflict, _languageService.GetString("Msg_HotkeyConflictTitle"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -1201,7 +1266,7 @@ public partial class MainWindow : Window
                 // ✅ 1.0.8: 用 enteringKey (trimmed) 检查，避免粘贴带空格文本时漏检
                 if (i != _editingIndex && _settings.LocalShortcuts[i].Key == enteringKey)
                 {
-                    System.Windows.MessageBox.Show("\u8BE5\u5FEB\u6377\u952E\u5DF2\u88AB\u5176\u4ED6\u9879\u4F7F\u7528\uFF01");
+                    System.Windows.MessageBox.Show(_languageService.GetString("Msg_HotkeyInUse"));
                     return;
                 }
             }
@@ -1231,16 +1296,18 @@ public partial class MainWindow : Window
                     else
                         _originalOrder = null;
                 }
-                System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} {GetHotkeyRegisterFailureDetail("\u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528")}\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
+                System.Windows.MessageBox.Show(
+                    _languageService.Format("Msg_SingleHotkeyFailed_Format", cfg.Key, GetHotkeyRegisterFailureDetail(_languageService.GetString("Msg_HotkeyOccupied_Generic"))),
+                    _languageService.GetString("Msg_HotkeyRegisterFailedTitle"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             _undoService.Record(preEditSnapshot,
-                UndoOperationType.Update, $"编辑 {oldCfg.Key}");
+                UndoOperationType.Update, _languageService.Format("Undo_Desc_Edit", oldCfg.Key));
             // ✅ 1.0.8: 删除死代码 —— cfg 是新实例，IndexOf 用引用比较永远返回 -1
             // UI 同步由末尾的 RefreshListView() 统一处理
             _editingIndex = -1;
-            BtnAdd.Content = "+ \u6DFB\u52A0";
+            BtnAdd.Content = _languageService.GetString("AddCard_Add_Btn");
             BtnCancelEdit.Visibility = Visibility.Collapsed;
         }
         else
@@ -1248,7 +1315,7 @@ public partial class MainWindow : Window
             // ✅ 1.0.8: 用 enteringKey (trimmed) 检查，避免粘贴带空格文本时漏检
             if (_settings.LocalShortcuts.Any(s => s.Key == enteringKey))
             {
-                System.Windows.MessageBox.Show("\u8BE5\u5FEB\u6377\u952E\u5DF2\u88AB\u5176\u4ED6\u9879\u4F7F\u7528\uFF01");
+                System.Windows.MessageBox.Show(_languageService.GetString("Msg_HotkeyInUse"));
                 return;
             }
 // ✅ Undo: 先留一份添加前的列表副本，注册成功后再 Record，避免注册失败留下幽灵撤销记录
@@ -1261,12 +1328,14 @@ public partial class MainWindow : Window
             {
                 _settings.LocalShortcuts.RemoveAt(_settings.LocalShortcuts.Count - 1);
                 _originalOrder?.Remove(cfg);
-                System.Windows.MessageBox.Show($"\u5FEB\u6377\u952E {cfg.Key} {GetHotkeyRegisterFailureDetail("\u5DF2\u88AB\u7CFB\u7EDF\u6216\u5176\u4ED6\u7A0B\u5E8F\u5360\u7528")}\uFF0C\u8BF7\u66F4\u6362\uFF01", "\u6CE8\u518C\u5931\u8D25",
+                System.Windows.MessageBox.Show(
+                    _languageService.Format("Msg_SingleHotkeyFailed_Format", cfg.Key, GetHotkeyRegisterFailureDetail(_languageService.GetString("Msg_HotkeyOccupied_Generic"))),
+                    _languageService.GetString("Msg_HotkeyRegisterFailedTitle"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             _undoService.Record(preAddSnapshot,
-                UndoOperationType.Add, $"添加 {cfg.Key}");
+                UndoOperationType.Add, _languageService.Format("Undo_Desc_Add", cfg.Key));
         }
         // Bug 6: 删除冗余的 RegisterAll，RegisterSingle 已经完成了注册
         await _settingsService.SaveAsync(_settings);
@@ -1277,11 +1346,11 @@ public partial class MainWindow : Window
     private void BtnCancelEdit_Click(object sender, RoutedEventArgs e)
     {
         _editingIndex = -1;
-        BtnAdd.Content = "+ \u6DFB\u52A0";
+        BtnAdd.Content = _languageService.GetString("AddCard_Add_Btn");
         BtnCancelEdit.Visibility = Visibility.Collapsed;
         ClearAddForm();
         LblEditTip.Visibility = Visibility.Collapsed;
-        LblCount.Text = $"{_settings.LocalShortcuts.Count} 项";
+        LblCount.Text = _languageService.Format("Main_Count_Format", _settings.LocalShortcuts.Count);
     }
 
     private void ClearAddForm()
@@ -1309,7 +1378,9 @@ public partial class MainWindow : Window
         if (LblAdvancedArrow != null)
             LblAdvancedArrow.Text = expanded ? "▾" : "▸";
         if (LblAdvancedTitle != null)
-            LblAdvancedTitle.Text = expanded ? "高级选项（参数 / 工作目录 / 运行策略）" : "高级选项";
+            LblAdvancedTitle.Text = expanded
+                ? _languageService.GetString("AddCard_Advanced_Expanded")
+                : _languageService.GetString("AddCard_Advanced_Title");
     }
 
     private string GetSelectedRunStrategy()
@@ -1413,14 +1484,15 @@ public partial class MainWindow : Window
         {
             TxtTarget.Focus();
             TxtTarget.SelectAll();
-            System.Windows.MessageBox.Show("\u8BF7\u76F4\u63A5\u8F93\u5165\u7F51\u5740\uFF0C\u4F8B\u5982 https://www.google.com",
-                "\u63D0\u793A", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(
+                _languageService.GetString("Msg_BrowseWebHint"),
+                _languageService.GetString("Common_Info"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         else if (type == ShortcutTypes.File)  // 文件类型：选择文档
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "\u5E38\u7528\u6587\u6863 (*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.txt)|*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.txt|\u6240\u6709\u6587\u4EF6 (*.*)|*.*"
+                Filter = _languageService.GetString("FileFilter_Documents")
             };
             if (dialog.ShowDialog() == true)
                 TxtTarget.Text = dialog.FileName;
@@ -1429,7 +1501,7 @@ public partial class MainWindow : Window
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "\u7A0B\u5E8F (*.exe)|*.exe|\u6240\u6709\u6587\u4EF6 (*.*)|*.*"
+                Filter = _languageService.GetString("FileFilter_Programs")
             };
             if (dialog.ShowDialog() == true)
                 TxtTarget.Text = dialog.FileName;
@@ -1442,8 +1514,8 @@ public partial class MainWindow : Window
         {
             var count = _settings.LocalShortcuts?.Count ?? 0;
             var confirm = System.Windows.MessageBox.Show(
-                $"导入将替换当前全部配置（现有 {count} 项快捷键）。\n是否继续？",
-                "确认导入", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                _languageService.Format("Msg_ImportConfirm_Format", count),
+                _languageService.GetString("Msg_ImportConfirmTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes) return;
 
             try
@@ -1456,8 +1528,8 @@ public partial class MainWindow : Window
                     if (validationError != null)
                     {
                         System.Windows.MessageBox.Show(
-                            $"配置导入已拒绝：{validationError}",
-                            "导入失败",
+                            _languageService.Format("Msg_ImportRejected_Format", validationError),
+                            _languageService.GetString("Msg_ImportFailedTitle"),
                             MessageBoxButton.OK,
                             MessageBoxImage.Warning);
                         return;
@@ -1521,20 +1593,22 @@ public partial class MainWindow : Window
                     // ✅ 1.0.8: 合并为单一消息框，避免双重弹窗
                     if (failedKeys.Count > 0 || globalHotkeyFail != null || pinHotkeyFail || pinToggleFail)
                     {
-                        var msg = "配置导入成功";
+                        var msg = _languageService.GetString("Msg_ImportPartialSuccess_Base");
                         if (failedKeys.Count > 0)
-                            msg += $"，但以下快捷键注册失败（可能被占用）：\n{string.Join("\n", failedKeys)}";
+                            msg += _languageService.Format("Msg_ImportPartialSuccess_LocalFail_Format", string.Join("\n", failedKeys));
                         if (globalHotkeyFail != null)
-                            msg += $"\n全局热键 {globalHotkeyFail} 注册失败，可稍后在'全局开关'中重新设置";
+                            msg += _languageService.Format("Msg_ImportPartialSuccess_GlobalFail_Format", globalHotkeyFail);
                         if (pinHotkeyFail)
-                            msg += "\n贴图快捷键注册失败，可稍后在“贴图工具”中重新设置";
+                            msg += _languageService.GetString("Msg_ImportPartialSuccess_PinFail");
                         if (pinToggleFail)
-                            msg += "\n贴图开关快捷键注册失败，可稍后在“贴图工具”中重新设置";
-                        System.Windows.MessageBox.Show(msg, "部分失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            msg += _languageService.GetString("Msg_ImportPartialSuccess_PinToggleFail");
+                        System.Windows.MessageBox.Show(msg, _languageService.GetString("Msg_ImportPartialTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     else
                     {
-                        System.Windows.MessageBox.Show("\u914D\u7F6E\u5BFC\u5165\u6210\u529F\uFF01", "\u63D0\u793A",
+                        System.Windows.MessageBox.Show(
+                            _languageService.GetString("Msg_ImportSuccess"),
+                            _languageService.GetString("Common_Info"),
                             MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     await _settingsService.SaveAsync(_settings);
@@ -1546,7 +1620,9 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"\u5BFC\u5165\u5931\u8D25: {ex.Message}", "\u9519\u8BEF",
+                System.Windows.MessageBox.Show(
+                    _languageService.Format("Msg_ImportError_Format", ex.Message),
+                    _languageService.GetString("Common_Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1556,7 +1632,7 @@ public partial class MainWindow : Window
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "JSON (*.json)|*.json",
-            FileName = "Vector\u914D\u7F6E.json"
+            FileName = _languageService.GetString("Export_DefaultFileName")
         };
         if (dialog.ShowDialog() == true)
         {
@@ -1600,7 +1676,7 @@ public partial class MainWindow : Window
             || (!string.IsNullOrWhiteSpace(cfg.RunStrategy)
                 && !string.Equals(RunStrategies.Normalize(cfg.RunStrategy), RunStrategies.Activate, StringComparison.OrdinalIgnoreCase));
         SetAdvancedExpanded(hasAdvanced);
-        BtnAdd.Content = "\u66F4\u65B0";
+        BtnAdd.Content = _languageService.GetString("Common_Update");
         BtnCancelEdit.Visibility = Visibility.Visible;
         LblEditTip.Visibility = Visibility.Visible;
         TxtLocalKey.Focus();
@@ -1805,7 +1881,7 @@ public partial class MainWindow : Window
         foreach (var s in source)
             LocalShortcuts.Add(s);
 
-        LblCount.Text = $"{_settings.LocalShortcuts.Count} \u9879";
+        LblCount.Text = _languageService.Format("Main_Count_Format", _settings.LocalShortcuts.Count);
         LblEmptyHint.Visibility = LocalShortcuts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         _foregroundMonitor?.TriggerCurrent();
     }
@@ -1850,7 +1926,11 @@ public partial class MainWindow : Window
         // 用 Tag 标识的 TextBlock 找回来，更新箭头
         var header = sender as System.Windows.Controls.TextBlock;
         if (header != null)
-            header.Text = _sortByType == true ? "类型 \u25B2" : "类型";
+        {
+            _headerTypeTextBlock = header;
+            var typeHeader = _languageService.GetString("List_Header_Type");
+            header.Text = _sortByType == true ? $"{typeHeader} \u25B2" : typeHeader;
+        }
 
         RefreshListView();
     }
@@ -1882,7 +1962,9 @@ public partial class MainWindow : Window
         if (BtnUndo == null) return; // InitializeComponent 之前
         var desc = _undoService.PeekDescription();
         BtnUndo.IsEnabled = _undoService.CanUndo;
-        BtnUndo.ToolTip = desc != null ? $"撤销：{desc}" : "撤销（无可撤销操作）";
+        BtnUndo.ToolTip = desc != null
+            ? _languageService.Format("Undo_Tooltip_WithDesc", desc)
+            : _languageService.GetString("Undo_Tooltip_Empty");
         BtnUndo.Opacity = _undoService.CanUndo ? 1.0 : 0.5;
     }
     /// <summary>执行撤销：恢复 LocalShortcuts + 重注册热键 + 持久化</summary>
@@ -1918,10 +2000,12 @@ public partial class MainWindow : Window
         // ✅ 7. 失败反馈 + 撤销提示
         if (failedKeys.Count > 0)
             System.Windows.MessageBox.Show(
-                $"已撤销：{entry.Description}\n但以下快捷键注册失败：\n{string.Join("\n", failedKeys)}",
-                "撤销完成", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _languageService.Format("Undo_PartialFail_Format", entry.Description, string.Join("\n", failedKeys)),
+                _languageService.GetString("Undo_Complete_Title"), MessageBoxButton.OK, MessageBoxImage.Warning);
         else
-            System.Windows.MessageBox.Show($"已撤销：{entry.Description}", "撤销",
+            System.Windows.MessageBox.Show(
+                _languageService.Format("Undo_Success_Format", entry.Description),
+                _languageService.GetString("Undo_Title"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
     }
     /// <summary>触发属性变更通知（替换 ObservableCollection 实例时用）</summary>
@@ -1937,7 +2021,7 @@ public partial class MainWindow : Window
         {
             if (IsTrayIconValid)
             {
-                var title = $"快捷键 {keyName} 执行失败";
+                var title = _languageService.Format("Msg_ExecuteFailedTitle_Format", keyName);
                 // 截断过长的错误信息（气泡提示最多 256 字符）
                 var tip = reason.Length > 200 ? reason[..200] + "..." : reason;
                 _trayIcon!.ShowBalloonTip(3000, title, tip, Forms.ToolTipIcon.Warning);

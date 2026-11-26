@@ -19,6 +19,7 @@ public sealed class PinFeatureService : IPinFeatureService
     private readonly IMouseGestureService _mouse;
     private readonly ScreenCaptureService _capture;
     private readonly ISettingsService? _settingsService;
+    private readonly ILanguageService? _languageService;
     private readonly GestureMatcher _matcher = new();
     private readonly List<System.Windows.Point> _points = new();
     private readonly List<PinImageWindow> _pinWindows = new();
@@ -52,11 +53,15 @@ public sealed class PinFeatureService : IPinFeatureService
     public PinFeatureService(
         IMouseGestureService mouseGestureService,
         ScreenCaptureService screenCaptureService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        ILanguageService? languageService = null)
         : this(mouseGestureService, screenCaptureService)
     {
         _settingsService = settingsService;
+        _languageService = languageService;
     }
+
+    private string L(string key, string fallback) => _languageService?.GetString(key) ?? fallback;
 
     public event Action<string>? NoticeRequested;
 
@@ -133,7 +138,7 @@ public sealed class PinFeatureService : IPinFeatureService
                 reason =>
                 {
                     _ = _settingsService?.LogAsync($"区域截图失败: {reason}");
-                    NoticeRequested?.Invoke("区域截图失败");
+                    NoticeRequested?.Invoke(L("Pin_Notice_RegionCaptureFailed", "区域截图失败"));
                 });
             _selector.Closed += (_, _) => _selector = null;
             _selector.Show();
@@ -148,7 +153,7 @@ public sealed class PinFeatureService : IPinFeatureService
                 return;
             if (!_clipboardGate.Wait(0))
             {
-                NoticeRequested?.Invoke("剪贴板仍在处理中，请稍后重试");
+                NoticeRequested?.Invoke(L("Pin_Notice_ClipboardBusy", "剪贴板仍在处理中，请稍后重试"));
                 return;
             }
             _ = PinClipboardAsync();
@@ -166,7 +171,7 @@ public sealed class PinFeatureService : IPinFeatureService
             if (!hookOff)
             {
                 _ = _settingsService?.LogAsync("剪贴板贴图已取消：鼠标钩子未能及时卸下");
-                NoticeRequested?.Invoke("暂时无法安全读取剪贴板，请稍后重试");
+                NoticeRequested?.Invoke(L("Pin_Notice_ClipboardUnsafe", "暂时无法安全读取剪贴板，请稍后重试"));
                 return;
             }
 
@@ -178,7 +183,7 @@ public sealed class PinFeatureService : IPinFeatureService
                 bool resume = hookOff;
                 hookOff = false;
                 _ = _settingsService?.LogAsync("读取剪贴板图片超时；鼠标钩子保持卸下，直到这次读取返回");
-                NoticeRequested?.Invoke("剪贴板没有及时返回，本次贴图已取消。现在可以继续点击其他窗口");
+                NoticeRequested?.Invoke(L("Pin_Notice_ClipboardTimeout", "剪贴板没有及时返回，本次贴图已取消。现在可以继续点击其他窗口"));
                 _ = readTask.ContinueWith(
                     task =>
                     {
@@ -203,14 +208,14 @@ public sealed class PinFeatureService : IPinFeatureService
             switch (payload.Status)
             {
                 case ClipboardReadStatus.Empty:
-                    NoticeRequested?.Invoke("剪贴板里没有图片");
+                    NoticeRequested?.Invoke(L("Pin_Notice_ClipboardEmpty", "剪贴板里没有图片"));
                     return;
                 case ClipboardReadStatus.Busy:
-                    NoticeRequested?.Invoke("剪贴板正被其他程序占用，请稍后重试");
+                    NoticeRequested?.Invoke(L("Pin_Notice_ClipboardOccupied", "剪贴板正被其他程序占用，请稍后重试"));
                     return;
                 case ClipboardReadStatus.Failed:
                     _ = _settingsService?.LogAsync($"读取剪贴板图片失败: {payload.Detail}");
-                    NoticeRequested?.Invoke("读取剪贴板图片失败");
+                    NoticeRequested?.Invoke(L("Pin_Notice_ClipboardReadFailed", "读取剪贴板图片失败"));
                     return;
             }
 
@@ -218,7 +223,7 @@ public sealed class PinFeatureService : IPinFeatureService
             if (image is null)
             {
                 _ = _settingsService?.LogAsync("剪贴板图片无法显示");
-                NoticeRequested?.Invoke("剪贴板里的图片无法显示");
+                NoticeRequested?.Invoke(L("Pin_Notice_ClipboardInvalidImage", "剪贴板里的图片无法显示"));
                 return;
             }
 
@@ -227,7 +232,7 @@ public sealed class PinFeatureService : IPinFeatureService
         catch (Exception ex)
         {
             _ = _settingsService?.LogAsync($"读取剪贴板图片失败: {ex}");
-            NoticeRequested?.Invoke("读取剪贴板图片失败");
+            NoticeRequested?.Invoke(L("Pin_Notice_ClipboardReadFailed", "读取剪贴板图片失败"));
         }
         finally
         {
@@ -380,7 +385,7 @@ public sealed class PinFeatureService : IPinFeatureService
         _pendingTracePoint = null;
         if (!_matcher.TryMatchRectangle(capturedPoints, out Rect bounds, out _))
         {
-            _overlay?.ShowResult("未匹配", _settings.FailureColor);
+            _overlay?.ShowResult(L("Pin_Overlay_Unmatched", "未匹配"), _settings.FailureColor);
             _clearOverlayAt = DateTime.UtcNow.AddMilliseconds(450);
             return;
         }
@@ -389,7 +394,7 @@ public sealed class PinFeatureService : IPinFeatureService
         CloseGestureOverlay();
         if (_pendingGestureCaptures >= MaxPendingGestureCaptures)
         {
-            NoticeRequested?.Invoke("截图处理中，请稍后再试");
+            NoticeRequested?.Invoke(L("Pin_Notice_CaptureBusy", "截图处理中，请稍后再试"));
             return;
         }
         _pendingGestureCaptures++;
@@ -433,7 +438,7 @@ public sealed class PinFeatureService : IPinFeatureService
     {
         if (!await _clipboardGate.WaitAsync(0))
         {
-            NoticeRequested?.Invoke("贴图已显示，但剪贴板仍在处理中");
+            NoticeRequested?.Invoke(L("Pin_Notice_PinShownClipboardBusy", "贴图已显示，但剪贴板仍在处理中"));
             return;
         }
 
@@ -444,7 +449,7 @@ public sealed class PinFeatureService : IPinFeatureService
             hookOff = await Task.Run(() => _mouse.SuspendHook(TimeSpan.FromMilliseconds(500)));
             if (!hookOff)
             {
-                NoticeRequested?.Invoke("贴图已显示，但暂时无法安全写入剪贴板");
+                NoticeRequested?.Invoke(L("Pin_Notice_PinShownClipboardUnsafe", "贴图已显示，但暂时无法安全写入剪贴板"));
                 return;
             }
 
@@ -452,13 +457,13 @@ public sealed class PinFeatureService : IPinFeatureService
             if (!wrote)
             {
                 _ = _settingsService?.LogAsync("截图后写入剪贴板失败");
-                NoticeRequested?.Invoke("贴图已显示，但复制到剪贴板失败");
+                NoticeRequested?.Invoke(L("Pin_Notice_PinShownClipboardCopyFailed", "贴图已显示，但复制到剪贴板失败"));
             }
         }
         catch (Exception ex)
         {
             _ = _settingsService?.LogAsync($"截图后复制到剪贴板失败: {ex}");
-            NoticeRequested?.Invoke("贴图已显示，但复制到剪贴板失败");
+            NoticeRequested?.Invoke(L("Pin_Notice_PinShownClipboardCopyFailed", "贴图已显示，但复制到剪贴板失败"));
         }
         finally
         {
@@ -566,7 +571,7 @@ public sealed class PinFeatureService : IPinFeatureService
         catch (Exception ex)
         {
             _ = _settingsService?.LogAsync($"手势截图失败: {ex}");
-            NoticeRequested?.Invoke("手势区域截图失败");
+            NoticeRequested?.Invoke(L("Pin_Notice_GestureCaptureFailed", "手势区域截图失败"));
         }
         finally
         {

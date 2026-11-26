@@ -28,15 +28,17 @@ public class ExecutorService : IExecutorService
 
     private readonly ISettingsService _settingsService;
     private readonly IFileTypeDetector _fileTypeDetector;
+    private readonly ILanguageService? _languageService;
     private volatile bool _diagnosticLogging;
 
     /// <summary>✅ 1.0.1: 脚本执行失败事件 —— UI 订阅后弹气泡通知用户</summary>
     public event Action<string, string, int?>? ExecuteFailed;  // (keyName, reason, exitCode)
 
-    public ExecutorService(ISettingsService settingsService, IFileTypeDetector fileTypeDetector)
+    public ExecutorService(ISettingsService settingsService, IFileTypeDetector fileTypeDetector, ILanguageService? languageService = null)
     {
         _settingsService = settingsService;
         _fileTypeDetector = fileTypeDetector;
+        _languageService = languageService;
     }
 
     public void SetDiagnosticLogging(bool enabled) => _diagnosticLogging = enabled;
@@ -168,7 +170,7 @@ public class ExecutorService : IExecutorService
             using var process = Process.Start(startInfo);
             if (process == null)
             {
-                NotifyFailed(cfg, "进程启动失败（返回 null）", null);
+                NotifyFailed(cfg, _languageService?.GetString("Executor_Err_ProcessStartNull") ?? "进程启动失败（返回 null）", null);
                 return;
             }
             LogDiagnostic($"Shortcut target started: key={cfg.Key}; processId={process.Id}; file={fileName}");
@@ -186,8 +188,10 @@ public class ExecutorService : IExecutorService
                 if (exitCode != 0 || !string.IsNullOrWhiteSpace(stderr))
                 {
                     var reason = !string.IsNullOrWhiteSpace(stderr)
-                        ? $"退出码 {exitCode}，错误输出：{stderr.Trim()}"
-                        : $"退出码 {exitCode}（非 0）";
+                        ? (_languageService?.Format("Executor_Err_ExitCodeStderr_Format", exitCode, stderr.Trim())
+                            ?? $"退出码 {exitCode}，错误输出：{stderr.Trim()}")
+                        : (_languageService?.Format("Executor_Err_ExitCode_Format", exitCode)
+                            ?? $"退出码 {exitCode}（非 0）");
                     NotifyFailed(cfg, reason, exitCode);
                 }
                 else

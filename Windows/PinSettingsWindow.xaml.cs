@@ -10,12 +10,14 @@ public partial class PinSettingsWindow : Window
 {
     private readonly Action _snapshot;
     private readonly Action _clipboard;
+    private readonly Vector.Services.ILanguageService? _languageService;
 
-    public PinSettingsWindow(PinSettings settings, Action snapshot, Action clipboard)
+    public PinSettingsWindow(PinSettings settings, Action snapshot, Action clipboard, Vector.Services.ILanguageService? languageService = null)
     {
         InitializeComponent();
         _snapshot = snapshot;
         _clipboard = clipboard;
+        _languageService = languageService;
         ChkEnabled.IsChecked = settings.Enabled;
         ChkDrawTrace.IsChecked = settings.DrawTrace;
         ChkCopyCaptureToClipboard.IsChecked = settings.CopyCaptureToClipboard;
@@ -53,7 +55,7 @@ public partial class PinSettingsWindow : Window
         ModifierKeys modifiers = Keyboard.Modifiers;
         if (modifiers == ModifierKeys.None)
         {
-            LblError.Text = "快捷键至少需要一个修饰键";
+            LblError.Text = _languageService?.GetString("PinSettings_Err_NeedModifier") ?? "快捷键至少需要一个修饰键";
             e.Handled = true;
             return;
         }
@@ -83,19 +85,19 @@ public partial class PinSettingsWindow : Window
         string toggle = TxtToggleKey.Text.Trim();
         if (string.IsNullOrEmpty(snapshot) || string.IsNullOrEmpty(clipboard))
         {
-            LblError.Text = "两个贴图快捷键都不能为空";
+            LblError.Text = _languageService?.GetString("PinSettings_Err_EmptyHotkeys") ?? "两个贴图快捷键都不能为空";
             return;
         }
         if (string.Equals(snapshot, clipboard, StringComparison.OrdinalIgnoreCase))
         {
-            LblError.Text = "两个贴图快捷键不能相同";
+            LblError.Text = _languageService?.GetString("PinSettings_Err_SameHotkeys") ?? "两个贴图快捷键不能相同";
             return;
         }
         if (!string.IsNullOrEmpty(toggle)
             && (string.Equals(toggle, snapshot, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(toggle, clipboard, StringComparison.OrdinalIgnoreCase)))
         {
-            LblError.Text = "贴图开关快捷键不能与框选或剪贴板快捷键相同";
+            LblError.Text = _languageService?.GetString("PinSettings_Err_ToggleConflict") ?? "贴图开关快捷键不能与框选或剪贴板快捷键相同";
             return;
         }
 
