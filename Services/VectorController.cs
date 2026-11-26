@@ -582,6 +582,36 @@ public sealed class VectorController : IVectorController, IDisposable
         _ = _settingsService.SaveAsync(_settings);
     }
 
+    public void SetMcpAllowWrites(bool enabled)
+    {
+        if (enabled == _settings.McpAllowWrites)
+            return;
+
+        _settings.McpAllowWrites = enabled;
+        _ = _settingsService.LogAsync($"MCP write tools {(enabled ? "enabled" : "disabled")}");
+        _ = _settingsService.SaveAsync(_settings);
+    }
+
+    public void SetMcpAllowExecute(bool enabled)
+    {
+        if (enabled == _settings.McpAllowExecute)
+            return;
+
+        _settings.McpAllowExecute = enabled;
+        _ = _settingsService.LogAsync($"MCP execute tool {(enabled ? "enabled" : "disabled")}");
+        _ = _settingsService.SaveAsync(_settings);
+    }
+
+    public string RegenerateMcpToken()
+    {
+        var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24))
+            .ToLowerInvariant();
+        _settings.McpToken = token;
+        _ = _settingsService.LogAsync("MCP token regenerated");
+        _ = _settingsService.SaveAsync(_settings);
+        return token;
+    }
+
     public void SetLanguage(string language)
     {
         if (string.Equals(language, _settings.Language, StringComparison.Ordinal))
