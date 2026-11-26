@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Vector.Models;
 
 namespace Vector.Services;
 
@@ -16,13 +17,13 @@ public class FileTypeDetector : IFileTypeDetector
 
     public string Detect(string target)
     {
-        if (string.IsNullOrWhiteSpace(target)) return "程序";
+        if (string.IsNullOrWhiteSpace(target)) return ShortcutTypes.Program;
         target = target.Trim();
 
         if (target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             target.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
             target.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
-            return "网页";
+            return ShortcutTypes.Web;
 
         // ✅ 1.0.5: .lnk 快捷方式 → 解开看真实目标再判断类型
         if (target.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
@@ -37,19 +38,19 @@ public class FileTypeDetector : IFileTypeDetector
         {
             var url = ResolveUrlShortcut(target);
             if (!string.IsNullOrEmpty(url))
-                return "网页";
+                return ShortcutTypes.Web;
         }
 
         try
         {
-            if (Directory.Exists(target)) return "文件夹";
+            if (Directory.Exists(target)) return ShortcutTypes.Folder;
             if (File.Exists(target))
             {
                 string ext = Path.GetExtension(target).ToLowerInvariant();
                 if (ext == ".exe" || ext == ".bat" || ext == ".cmd" ||
                     ext == ".ps1" || ext == ".vbs")
-                    return "程序";
-                return "文件";
+                    return ShortcutTypes.Program;
+                return ShortcutTypes.File;
             }
         }
         catch (Exception ex)
@@ -58,7 +59,7 @@ public class FileTypeDetector : IFileTypeDetector
             Debug.WriteLine($"[FileTypeDetector] 检测失败 target={target}: {ex.GetType().Name}: {ex.Message}");
         }
 
-        return "程序";
+        return ShortcutTypes.Program;
     }
 
     public string ResolveShortcut(string lnkPath)
