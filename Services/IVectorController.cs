@@ -76,6 +76,9 @@ public interface IVectorController
     void SetDiagnosticLogging(bool enabled);
     void SetCoexistenceEnabled(bool enabled);
     void SetMcpEnabled(bool enabled);
+    void SetMcpAllowWrites(bool enabled);
+    void SetMcpAllowExecute(bool enabled);
+    string RegenerateMcpToken();
     void SetLanguage(string language);
     Task SetStartupDelayAsync(int seconds, CancellationToken ct = default);
 }
