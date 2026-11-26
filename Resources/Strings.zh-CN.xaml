@@ -70,4 +70,166 @@
     <sys:String x:Key="Pin_FromClipboard_Btn">剪贴板贴图</sys:String>
     <sys:String x:Key="Pin_Cancel_Btn">取消</sys:String>
     <sys:String x:Key="Pin_Save_Btn">保存</sys:String>
+
+    <!-- Common -->
+    <sys:String x:Key="Common_Warning">警告</sys:String>
+    <sys:String x:Key="Common_Error">错误</sys:String>
+    <sys:String x:Key="Common_Info">提示</sys:String>
+    <sys:String x:Key="Common_Success">成功</sys:String>
+    <sys:String x:Key="Common_Cancelled">已取消</sys:String>
+    <sys:String x:Key="Common_Edit">编辑</sys:String>
+    <sys:String x:Key="Common_Delete">删除</sys:String>
+    <sys:String x:Key="Common_Update">更新</sys:String>
+
+    <!-- MainWindow C# -->
+    <sys:String x:Key="Main_Count_Format">{0} 项</sys:String>
+    <sys:String x:Key="AddCard_Advanced_Expanded">高级选项（参数 / 工作目录 / 运行策略）</sys:String>
+    <sys:String x:Key="Undo_Desc_DeleteSingle">删除 {0}</sys:String>
+    <sys:String x:Key="Undo_Desc_DeleteMultiple">删除 {0} 项</sys:String>
+    <sys:String x:Key="Undo_Desc_Edit">编辑 {0}</sys:String>
+    <sys:String x:Key="Undo_Desc_Add">添加 {0}</sys:String>
+    <sys:String x:Key="Undo_Tooltip_WithDesc">撤销：{0}</sys:String>
+    <sys:String x:Key="Undo_Tooltip_Empty">撤销（无可撤销操作）</sys:String>
+    <sys:String x:Key="Undo_Complete_Title">撤销完成</sys:String>
+    <sys:String x:Key="Undo_Title">撤销</sys:String>
+    <sys:String x:Key="Undo_Success_Format">已撤销：{0}</sys:String>
+    <sys:String x:Key="Undo_PartialFail_Format">已撤销：{0}&#10;但以下快捷键注册失败：&#10;{1}</sys:String>
+
+    <!-- Status & Tray -->
+    <sys:String x:Key="Status_AllDisabled">全部功能已手动关闭</sys:String>
+    <sys:String x:Key="Status_AllPaused">已全部暂停</sys:String>
+    <sys:String x:Key="Status_HotkeysPaused">快捷键已暂停</sys:String>
+    <sys:String x:Key="Status_PinPaused">截图已暂停</sys:String>
+    <sys:String x:Key="Status_PinDisabled">截图已手动关闭</sys:String>
+    <sys:String x:Key="Status_HotkeysDisabled">快捷键已手动关闭</sys:String>
+    <sys:String x:Key="Tray_AdminSuffix"> [管理员]</sys:String>
+    <sys:String x:Key="Tray_Minimized_Tip">已最小化到托盘</sys:String>
+    <sys:String x:Key="Tray_Menu_Show">显示</sys:String>
+    <sys:String x:Key="Tray_Menu_RegionCapture">框选贴图</sys:String>
+    <sys:String x:Key="Tray_Menu_ClipboardPin">剪贴板贴图</sys:String>
+    <sys:String x:Key="Tray_Menu_PinSettings">贴图设置</sys:String>
+    <sys:String x:Key="Tray_Menu_PauseActive">暂停当前启用功能</sys:String>
+    <sys:String x:Key="Tray_Menu_ResumeActive">恢复当前启用功能</sys:String>
+    <sys:String x:Key="Tray_Menu_AllDisabled">所有功能已手动关闭</sys:String>
+    <sys:String x:Key="Tray_Menu_DisablePin">手动关闭截图</sys:String>
+    <sys:String x:Key="Tray_Menu_EnablePin">手动启用截图</sys:String>
+    <sys:String x:Key="Tray_Menu_ReregisterHotkeys">立即重新注册热键</sys:String>
+    <sys:String x:Key="Tray_Menu_ToggleTheme">切换深/浅色模式</sys:String>
+    <sys:String x:Key="Tray_Menu_AutoStart">开机启动</sys:String>
+    <sys:String x:Key="Tray_Menu_Portable">配置保存在程序目录（便携换机）</sys:String>
+    <sys:String x:Key="Tray_Menu_OpenConfigFolder">打开配置文件夹</sys:String>
+    <sys:String x:Key="Tray_Menu_RunAsAdmin">以管理员模式启动</sys:String>
+    <sys:String x:Key="Tray_Menu_Exit">退出</sys:String>
+
+    <!-- MainWindow Messages & Filters -->
+    <sys:String x:Key="Msg_InitFailed_Format">初始化失败: {0}</sys:String>
+    <sys:String x:Key="Msg_HotkeysRegisterFailed_Format">以下快捷键注册失败（可能被占用）：&#10;{0}</sys:String>
+    <sys:String x:Key="Msg_ResumeHotkeysRegisterFailed_Format">系统恢复后以下快捷键重新注册失败（可能被占用）：&#10;{0}</sys:String>
+    <sys:String x:Key="Msg_PinHotkeyRegisterFailed">贴图快捷键注册失败，请在贴图设置中更换组合键</sys:String>
+    <sys:String x:Key="Msg_PinToggleHotkeyRegisterFailed">贴图开关快捷键注册失败，请在贴图设置中更换组合键</sys:String>
+    <sys:String x:Key="Msg_PinInitFailed">贴图工具初始化失败，详情已写入日志</sys:String>
+    <sys:String x:Key="Msg_ResumePinHotkeyFailed">系统恢复后贴图快捷键重新注册失败</sys:String>
+    <sys:String x:Key="Msg_ResumePinToggleFailed">系统恢复后贴图开关快捷键重新注册失败</sys:String>
+    <sys:String x:Key="Msg_PinSettingsSaved">贴图设置已保存并立即生效</sys:String>
+    <sys:String x:Key="Msg_AutoStartFailed">无法修改开机启动项（可能权限不足）。</sys:String>
+    <sys:String x:Key="Msg_PortableTitle">便携配置</sys:String>
+    <sys:String x:Key="Msg_OpenFolderFailed_Format">无法打开：{0}</sys:String>
+    <sys:String x:Key="Msg_AdminRestartPrompt">需要以管理员身份重启 Vector 才能让全局热键穿透到高权限程序（如全屏游戏）。&#10;&#10;是否立即重启？</sys:String>
+    <sys:String x:Key="Msg_AdminRestartTitle">UIPI 提权</sys:String>
+    <sys:String x:Key="Msg_ExePathNotFound">无法获取程序路径，请手动重启。</sys:String>
+    <sys:String x:Key="Msg_ElevationFailed">启动提权进程失败（可能被系统拒绝或用户取消 UAC）。当前进程继续运行，请稍后重试。</sys:String>
+    <sys:String x:Key="Msg_ElevationFailedTitle">提权失败</sys:String>
+    <sys:String x:Key="Msg_ElevationCancelled">已取消管理员重启。当前进程仍以普通权限运行，全局热键可能无法在管理员程序中触发。</sys:String>
+    <sys:String x:Key="Msg_RestartFailed_Format">重启失败: {0}</sys:String>
+    <sys:String x:Key="Msg_HotkeyConflictTitle">快捷键冲突</sys:String>
+    <sys:String x:Key="Msg_HotkeyUnavailableTitle">快捷键不可用</sys:String>
+    <sys:String x:Key="Msg_HotkeyRegisterFailedTitle">注册失败</sys:String>
+    <sys:String x:Key="Msg_GlobalHotkeyDisabled">已关闭全局开关热键</sys:String>
+    <sys:String x:Key="Msg_GlobalHotkeySaved">全局热键已保存</sys:String>
+    <sys:String x:Key="Msg_GlobalRegisterFailed_Generic">热键注册失败，可能被其他程序占用。&#10;请尝试其他组合。</sys:String>
+    <sys:String x:Key="Msg_GlobalRegisterFailed_1409">热键注册失败，已被系统或其他程序占用（Win32 错误 1409）。&#10;请尝试其他组合。</sys:String>
+    <sys:String x:Key="Msg_GlobalRegisterFailed_Code_Format">热键注册失败（Win32 错误 {0}）。&#10;请尝试其他组合。</sys:String>
+    <sys:String x:Key="Msg_PinToggleRegisterFailed_Generic">贴图开关快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。</sys:String>
+    <sys:String x:Key="Msg_PinToggleRegisterFailed_1409">贴图开关快捷键注册失败，已被系统或其他程序占用（Win32 错误 1409）。旧快捷键仍保持可用。</sys:String>
+    <sys:String x:Key="Msg_PinToggleRegisterFailed_Code_Format">贴图开关快捷键注册失败（Win32 错误 {0}）。旧快捷键仍保持可用。</sys:String>
+    <sys:String x:Key="Msg_PinHotkeysRegisterFailed_Generic">贴图快捷键注册失败，可能与 Vector 快捷键或其他程序冲突。旧快捷键仍保持可用。</sys:String>
+    <sys:String x:Key="Msg_PinHotkeysRegisterFailed_1409">贴图快捷键注册失败，已被系统或其他程序占用（Win32 错误 1409）。旧快捷键仍保持可用。</sys:String>
+    <sys:String x:Key="Msg_PinHotkeysRegisterFailed_Code_Format">贴图快捷键注册失败（Win32 错误 {0}）。旧快捷键仍保持可用。</sys:String>
+    <sys:String x:Key="Msg_HotkeyInUse">该快捷键已被其他项使用！</sys:String>
+    <sys:String x:Key="Msg_HotkeyOccupied_Generic">已被系统或其他程序占用</sys:String>
+    <sys:String x:Key="Msg_HotkeyOccupied_1409">已被系统或其他程序占用（Win32 错误 1409）</sys:String>
+    <sys:String x:Key="Msg_HotkeyOccupied_Code_Format">注册失败（Win32 错误 {0}）</sys:String>
+    <sys:String x:Key="Msg_SingleHotkeyFailed_Format">快捷键 {0} {1}，请更换！</sys:String>
+    <sys:String x:Key="Msg_BrowseWebHint">请直接输入网址，例如 https://www.google.com</sys:String>
+    <sys:String x:Key="FileFilter_Documents">常用文档 (*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.txt)|*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.txt|所有文件 (*.*)|*.*</sys:String>
+    <sys:String x:Key="FileFilter_Programs">程序 (*.exe)|*.exe|所有文件 (*.*)|*.*</sys:String>
+    <sys:String x:Key="Msg_ImportConfirm_Format">导入将替换当前全部配置（现有 {0} 项快捷键）。&#10;是否继续？</sys:String>
+    <sys:String x:Key="Msg_ImportConfirmTitle">确认导入</sys:String>
+    <sys:String x:Key="Msg_ImportRejected_Format">配置导入已拒绝：{0}</sys:String>
+    <sys:String x:Key="Msg_ImportFailedTitle">导入失败</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_Base">配置导入成功</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_LocalFail_Format">，但以下快捷键注册失败（可能被占用）：&#10;{0}</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_GlobalFail_Format">&#10;全局热键 {0} 注册失败，可稍后在'全局开关'中重新设置</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_PinFail">&#10;贴图快捷键注册失败，可稍后在“贴图工具”中重新设置</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_PinToggleFail">&#10;贴图开关快捷键注册失败，可稍后在“贴图工具”中重新设置</sys:String>
+    <sys:String x:Key="Msg_ImportPartialTitle">部分失败</sys:String>
+    <sys:String x:Key="Msg_ImportSuccess">配置导入成功！</sys:String>
+    <sys:String x:Key="Msg_ImportError_Format">导入失败: {0}</sys:String>
+    <sys:String x:Key="Export_DefaultFileName">Vector配置.json</sys:String>
+    <sys:String x:Key="Msg_ExecuteFailedTitle_Format">快捷键 {0} 执行失败</sys:String>
+
+    <!-- Conflict & Import Validation -->
+    <sys:String x:Key="Conflict_InvalidFormat">快捷键格式无效</sys:String>
+    <sys:String x:Key="Conflict_LocalUsed_Format">该组合键已被本地快捷键「{0}」使用</sys:String>
+    <sys:String x:Key="Conflict_GlobalUsed">该组合键已被全局开关热键使用</sys:String>
+    <sys:String x:Key="Conflict_PinSnapshotUsed">该组合键已被贴图框选热键使用</sys:String>
+    <sys:String x:Key="Conflict_PinClipboardUsed">该组合键已被剪贴板贴图热键使用</sys:String>
+    <sys:String x:Key="Conflict_PinToggleUsed">该组合键已被贴图开关热键使用</sys:String>
+    <sys:String x:Key="Label_LocalShortcut">本地快捷键</sys:String>
+    <sys:String x:Key="Label_GlobalHotkey">全局开关热键</sys:String>
+    <sys:String x:Key="Label_PinSnapshotHotkey">贴图框选热键</sys:String>
+    <sys:String x:Key="Label_PinClipboardHotkey">剪贴板贴图热键</sys:String>
+    <sys:String x:Key="Label_PinToggleHotkey">贴图开关热键</sys:String>
+    <sys:String x:Key="Import_PinIncomplete_Format">贴图热键配置不完整：{0}为空</sys:String>
+    <sys:String x:Key="Import_EntryInvalidFormat_Format">{0}「{1}」无效：快捷键格式无效</sys:String>
+    <sys:String x:Key="Import_EntryRejected_Format">{0}「{1}」无效：{2}</sys:String>
+    <sys:String x:Key="Import_EntryConflict_Format">{0}「{1}」与{2}冲突（组合键重复）</sys:String>
+    <sys:String x:Key="Import_EntryLabel_Format">{0}「{1}」</sys:String>
+
+    <!-- PinFeatureService -->
+    <sys:String x:Key="Pin_Notice_RegionCaptureFailed">区域截图失败</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardBusy">剪贴板仍在处理中，请稍后重试</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardUnsafe">暂时无法安全读取剪贴板，请稍后重试</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardTimeout">剪贴板没有及时返回，本次贴图已取消。现在可以继续点击其他窗口</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardEmpty">剪贴板里没有图片</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardOccupied">剪贴板正被其他程序占用，请稍后重试</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardReadFailed">读取剪贴板图片失败</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardInvalidImage">剪贴板里的图片无法显示</sys:String>
+    <sys:String x:Key="Pin_Overlay_Unmatched">未匹配</sys:String>
+    <sys:String x:Key="Pin_Notice_CaptureBusy">截图处理中，请稍后再试</sys:String>
+    <sys:String x:Key="Pin_Notice_PinShownClipboardBusy">贴图已显示，但剪贴板仍在处理中</sys:String>
+    <sys:String x:Key="Pin_Notice_PinShownClipboardUnsafe">贴图已显示，但暂时无法安全写入剪贴板</sys:String>
+    <sys:String x:Key="Pin_Notice_PinShownClipboardCopyFailed">贴图已显示，但复制到剪贴板失败</sys:String>
+    <sys:String x:Key="Pin_Notice_GestureCaptureFailed">手势区域截图失败</sys:String>
+
+    <!-- HotkeyService -->
+    <sys:String x:Key="Hotkey_Reject_Empty">快捷键不能为空</sys:String>
+    <sys:String x:Key="Hotkey_Reject_Reserved_Format">「{0}」是系统保留快捷键，请选择其他组合</sys:String>
+    <sys:String x:Key="Hotkey_Reject_InvalidFormat">快捷键格式无效，请重新录入组合键</sys:String>
+
+    <!-- PinSettingsWindow C# -->
+    <sys:String x:Key="PinSettings_Err_NeedModifier">快捷键至少需要一个修饰键</sys:String>
+    <sys:String x:Key="PinSettings_Err_EmptyHotkeys">两个贴图快捷键都不能为空</sys:String>
+    <sys:String x:Key="PinSettings_Err_SameHotkeys">两个贴图快捷键不能相同</sys:String>
+    <sys:String x:Key="PinSettings_Err_ToggleConflict">贴图开关快捷键不能与框选或剪贴板快捷键相同</sys:String>
+
+    <!-- ExecutorService -->
+    <sys:String x:Key="Executor_Err_ProcessStartNull">进程启动失败（返回 null）</sys:String>
+    <sys:String x:Key="Executor_Err_ExitCodeStderr_Format">退出码 {0}，错误输出：{1}</sys:String>
+    <sys:String x:Key="Executor_Err_ExitCode_Format">退出码 {0}（非 0）</sys:String>
+
+    <!-- SettingsService -->
+    <sys:String x:Key="Settings_Portable_Enabled">已启用便携模式（配置将保存在程序目录）。请重启 Vector 后生效。</sys:String>
+    <sys:String x:Key="Settings_Portable_Disabled">已关闭便携模式（配置改用用户目录）。请重启 Vector 后生效。</sys:String>
+    <sys:String x:Key="Settings_Portable_SwitchFailed_Format">切换失败：{0}</sys:String>
 </ResourceDictionary>

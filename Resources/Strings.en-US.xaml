@@ -70,4 +70,166 @@
     <sys:String x:Key="Pin_FromClipboard_Btn">Pin Clipboard</sys:String>
     <sys:String x:Key="Pin_Cancel_Btn">Cancel</sys:String>
     <sys:String x:Key="Pin_Save_Btn">Save</sys:String>
+
+    <!-- Common -->
+    <sys:String x:Key="Common_Warning">Warning</sys:String>
+    <sys:String x:Key="Common_Error">Error</sys:String>
+    <sys:String x:Key="Common_Info">Info</sys:String>
+    <sys:String x:Key="Common_Success">Success</sys:String>
+    <sys:String x:Key="Common_Cancelled">Cancelled</sys:String>
+    <sys:String x:Key="Common_Edit">Edit</sys:String>
+    <sys:String x:Key="Common_Delete">Delete</sys:String>
+    <sys:String x:Key="Common_Update">Update</sys:String>
+
+    <!-- MainWindow C# -->
+    <sys:String x:Key="Main_Count_Format">{0} items</sys:String>
+    <sys:String x:Key="AddCard_Advanced_Expanded">Advanced Options (Args / Working Dir / Run Policy)</sys:String>
+    <sys:String x:Key="Undo_Desc_DeleteSingle">Delete {0}</sys:String>
+    <sys:String x:Key="Undo_Desc_DeleteMultiple">Delete {0} items</sys:String>
+    <sys:String x:Key="Undo_Desc_Edit">Edit {0}</sys:String>
+    <sys:String x:Key="Undo_Desc_Add">Add {0}</sys:String>
+    <sys:String x:Key="Undo_Tooltip_WithDesc">Undo: {0}</sys:String>
+    <sys:String x:Key="Undo_Tooltip_Empty">Undo (nothing to undo)</sys:String>
+    <sys:String x:Key="Undo_Complete_Title">Undo Complete</sys:String>
+    <sys:String x:Key="Undo_Title">Undo</sys:String>
+    <sys:String x:Key="Undo_Success_Format">Undone: {0}</sys:String>
+    <sys:String x:Key="Undo_PartialFail_Format">Undone: {0}&#10;However, the following hotkeys failed to register:&#10;{1}</sys:String>
+
+    <!-- Status & Tray -->
+    <sys:String x:Key="Status_AllDisabled">All features manually disabled</sys:String>
+    <sys:String x:Key="Status_AllPaused">All paused</sys:String>
+    <sys:String x:Key="Status_HotkeysPaused">Hotkeys paused</sys:String>
+    <sys:String x:Key="Status_PinPaused">Pin paused</sys:String>
+    <sys:String x:Key="Status_PinDisabled">Pin manually disabled</sys:String>
+    <sys:String x:Key="Status_HotkeysDisabled">Hotkeys manually disabled</sys:String>
+    <sys:String x:Key="Tray_AdminSuffix"> [Admin]</sys:String>
+    <sys:String x:Key="Tray_Minimized_Tip">Minimized to tray</sys:String>
+    <sys:String x:Key="Tray_Menu_Show">Show</sys:String>
+    <sys:String x:Key="Tray_Menu_RegionCapture">Region Capture</sys:String>
+    <sys:String x:Key="Tray_Menu_ClipboardPin">Clipboard Pin</sys:String>
+    <sys:String x:Key="Tray_Menu_PinSettings">Pin Settings</sys:String>
+    <sys:String x:Key="Tray_Menu_PauseActive">Pause Active Features</sys:String>
+    <sys:String x:Key="Tray_Menu_ResumeActive">Resume Active Features</sys:String>
+    <sys:String x:Key="Tray_Menu_AllDisabled">All Features Disabled</sys:String>
+    <sys:String x:Key="Tray_Menu_DisablePin">Disable Pin</sys:String>
+    <sys:String x:Key="Tray_Menu_EnablePin">Enable Pin</sys:String>
+    <sys:String x:Key="Tray_Menu_ReregisterHotkeys">Re-register Hotkeys Now</sys:String>
+    <sys:String x:Key="Tray_Menu_ToggleTheme">Toggle Dark/Light Theme</sys:String>
+    <sys:String x:Key="Tray_Menu_AutoStart">Launch at Startup</sys:String>
+    <sys:String x:Key="Tray_Menu_Portable">Portable Mode (Save in App Folder)</sys:String>
+    <sys:String x:Key="Tray_Menu_OpenConfigFolder">Open Config Folder</sys:String>
+    <sys:String x:Key="Tray_Menu_RunAsAdmin">Run as Administrator</sys:String>
+    <sys:String x:Key="Tray_Menu_Exit">Exit</sys:String>
+
+    <!-- MainWindow Messages & Filters -->
+    <sys:String x:Key="Msg_InitFailed_Format">Initialization failed: {0}</sys:String>
+    <sys:String x:Key="Msg_HotkeysRegisterFailed_Format">The following hotkeys failed to register (may be in use):&#10;{0}</sys:String>
+    <sys:String x:Key="Msg_ResumeHotkeysRegisterFailed_Format">The following hotkeys failed to re-register after resume (may be in use):&#10;{0}</sys:String>
+    <sys:String x:Key="Msg_PinHotkeyRegisterFailed">Pin hotkey registration failed. Please choose another key combo in Pin Settings.</sys:String>
+    <sys:String x:Key="Msg_PinToggleHotkeyRegisterFailed">Pin toggle hotkey registration failed. Please choose another key combo in Pin Settings.</sys:String>
+    <sys:String x:Key="Msg_PinInitFailed">Pin tool initialization failed. See log for details.</sys:String>
+    <sys:String x:Key="Msg_ResumePinHotkeyFailed">Pin hotkey failed to re-register after resume</sys:String>
+    <sys:String x:Key="Msg_ResumePinToggleFailed">Pin toggle hotkey failed to re-register after resume</sys:String>
+    <sys:String x:Key="Msg_PinSettingsSaved">Pin settings saved and applied</sys:String>
+    <sys:String x:Key="Msg_AutoStartFailed">Unable to modify startup entry (insufficient permissions).</sys:String>
+    <sys:String x:Key="Msg_PortableTitle">Portable Config</sys:String>
+    <sys:String x:Key="Msg_OpenFolderFailed_Format">Unable to open: {0}</sys:String>
+    <sys:String x:Key="Msg_AdminRestartPrompt">Vector needs to restart as Administrator for global hotkeys to work in elevated apps (e.g. fullscreen games).&#10;&#10;Restart now?</sys:String>
+    <sys:String x:Key="Msg_AdminRestartTitle">UIPI Elevation</sys:String>
+    <sys:String x:Key="Msg_ExePathNotFound">Unable to get executable path. Please restart manually.</sys:String>
+    <sys:String x:Key="Msg_ElevationFailed">Failed to start elevated process (denied by system or UAC cancelled). Continuing with current process.</sys:String>
+    <sys:String x:Key="Msg_ElevationFailedTitle">Elevation Failed</sys:String>
+    <sys:String x:Key="Msg_ElevationCancelled">Admin restart cancelled. Running with standard privileges; global hotkeys may not trigger in elevated apps.</sys:String>
+    <sys:String x:Key="Msg_RestartFailed_Format">Restart failed: {0}</sys:String>
+    <sys:String x:Key="Msg_HotkeyConflictTitle">Hotkey Conflict</sys:String>
+    <sys:String x:Key="Msg_HotkeyUnavailableTitle">Hotkey Unavailable</sys:String>
+    <sys:String x:Key="Msg_HotkeyRegisterFailedTitle">Registration Failed</sys:String>
+    <sys:String x:Key="Msg_GlobalHotkeyDisabled">Global toggle hotkey disabled</sys:String>
+    <sys:String x:Key="Msg_GlobalHotkeySaved">Global hotkey saved</sys:String>
+    <sys:String x:Key="Msg_GlobalRegisterFailed_Generic">Hotkey registration failed (may be in use by another app).&#10;Please try another combo.</sys:String>
+    <sys:String x:Key="Msg_GlobalRegisterFailed_1409">Hotkey registration failed: already in use by system or another app (Win32 error 1409).&#10;Please try another combo.</sys:String>
+    <sys:String x:Key="Msg_GlobalRegisterFailed_Code_Format">Hotkey registration failed (Win32 error {0}).&#10;Please try another combo.</sys:String>
+    <sys:String x:Key="Msg_PinToggleRegisterFailed_Generic">Pin toggle hotkey registration failed (may conflict with Vector or another app). Previous hotkey remains active.</sys:String>
+    <sys:String x:Key="Msg_PinToggleRegisterFailed_1409">Pin toggle hotkey registration failed: in use by system or another app (Win32 error 1409). Previous hotkey remains active.</sys:String>
+    <sys:String x:Key="Msg_PinToggleRegisterFailed_Code_Format">Pin toggle hotkey registration failed (Win32 error {0}). Previous hotkey remains active.</sys:String>
+    <sys:String x:Key="Msg_PinHotkeysRegisterFailed_Generic">Pin hotkeys registration failed (may conflict with Vector or another app). Previous hotkeys remain active.</sys:String>
+    <sys:String x:Key="Msg_PinHotkeysRegisterFailed_1409">Pin hotkeys registration failed: in use by system or another app (Win32 error 1409). Previous hotkeys remain active.</sys:String>
+    <sys:String x:Key="Msg_PinHotkeysRegisterFailed_Code_Format">Pin hotkeys registration failed (Win32 error {0}). Previous hotkeys remain active.</sys:String>
+    <sys:String x:Key="Msg_HotkeyInUse">This hotkey is already in use by another item!</sys:String>
+    <sys:String x:Key="Msg_HotkeyOccupied_Generic">is already in use by system or another app</sys:String>
+    <sys:String x:Key="Msg_HotkeyOccupied_1409">is in use by system or another app (Win32 error 1409)</sys:String>
+    <sys:String x:Key="Msg_HotkeyOccupied_Code_Format">registration failed (Win32 error {0})</sys:String>
+    <sys:String x:Key="Msg_SingleHotkeyFailed_Format">Hotkey {0} {1}. Please choose another!</sys:String>
+    <sys:String x:Key="Msg_BrowseWebHint">Please enter a URL directly, e.g. https://www.google.com</sys:String>
+    <sys:String x:Key="FileFilter_Documents">Documents (*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.txt)|*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.txt|All Files (*.*)|*.*</sys:String>
+    <sys:String x:Key="FileFilter_Programs">Programs (*.exe)|*.exe|All Files (*.*)|*.*</sys:String>
+    <sys:String x:Key="Msg_ImportConfirm_Format">Importing will replace all current settings ({0} shortcuts).&#10;Continue?</sys:String>
+    <sys:String x:Key="Msg_ImportConfirmTitle">Confirm Import</sys:String>
+    <sys:String x:Key="Msg_ImportRejected_Format">Import rejected: {0}</sys:String>
+    <sys:String x:Key="Msg_ImportFailedTitle">Import Failed</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_Base">Settings imported</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_LocalFail_Format">, but the following hotkeys failed to register (may be in use):&#10;{0}</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_GlobalFail_Format">&#10;Global hotkey {0} failed to register. You can reconfigure it in Global Toggle.</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_PinFail">&#10;Pin hotkeys failed to register. You can reconfigure them in Pin Tool.</sys:String>
+    <sys:String x:Key="Msg_ImportPartialSuccess_PinToggleFail">&#10;Pin toggle hotkey failed to register. You can reconfigure it in Pin Tool.</sys:String>
+    <sys:String x:Key="Msg_ImportPartialTitle">Partial Failure</sys:String>
+    <sys:String x:Key="Msg_ImportSuccess">Settings imported successfully!</sys:String>
+    <sys:String x:Key="Msg_ImportError_Format">Import failed: {0}</sys:String>
+    <sys:String x:Key="Export_DefaultFileName">Vector-Config.json</sys:String>
+    <sys:String x:Key="Msg_ExecuteFailedTitle_Format">Hotkey {0} execution failed</sys:String>
+
+    <!-- Conflict & Import Validation -->
+    <sys:String x:Key="Conflict_InvalidFormat">Invalid hotkey format</sys:String>
+    <sys:String x:Key="Conflict_LocalUsed_Format">This key combo is already used by local shortcut "{0}"</sys:String>
+    <sys:String x:Key="Conflict_GlobalUsed">This key combo is already used by the global toggle hotkey</sys:String>
+    <sys:String x:Key="Conflict_PinSnapshotUsed">This key combo is already used by the region capture hotkey</sys:String>
+    <sys:String x:Key="Conflict_PinClipboardUsed">This key combo is already used by the clipboard pin hotkey</sys:String>
+    <sys:String x:Key="Conflict_PinToggleUsed">This key combo is already used by the pin toggle hotkey</sys:String>
+    <sys:String x:Key="Label_LocalShortcut">Local shortcut</sys:String>
+    <sys:String x:Key="Label_GlobalHotkey">Global toggle hotkey</sys:String>
+    <sys:String x:Key="Label_PinSnapshotHotkey">Region capture hotkey</sys:String>
+    <sys:String x:Key="Label_PinClipboardHotkey">Clipboard pin hotkey</sys:String>
+    <sys:String x:Key="Label_PinToggleHotkey">Pin toggle hotkey</sys:String>
+    <sys:String x:Key="Import_PinIncomplete_Format">Incomplete pin hotkey config: {0} is empty</sys:String>
+    <sys:String x:Key="Import_EntryInvalidFormat_Format">{0} "{1}" is invalid: invalid hotkey format</sys:String>
+    <sys:String x:Key="Import_EntryRejected_Format">{0} "{1}" is invalid: {2}</sys:String>
+    <sys:String x:Key="Import_EntryConflict_Format">{0} "{1}" conflicts with {2} (duplicate key combo)</sys:String>
+    <sys:String x:Key="Import_EntryLabel_Format">{0} "{1}"</sys:String>
+
+    <!-- PinFeatureService -->
+    <sys:String x:Key="Pin_Notice_RegionCaptureFailed">Region capture failed</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardBusy">Clipboard is still busy. Please try again later.</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardUnsafe">Unable to safely read clipboard right now. Please try again later.</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardTimeout">Clipboard timed out; pin cancelled. You can continue using other windows.</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardEmpty">No image found in clipboard</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardOccupied">Clipboard is in use by another app. Please try again later.</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardReadFailed">Failed to read image from clipboard</sys:String>
+    <sys:String x:Key="Pin_Notice_ClipboardInvalidImage">The image in clipboard cannot be displayed</sys:String>
+    <sys:String x:Key="Pin_Overlay_Unmatched">No match</sys:String>
+    <sys:String x:Key="Pin_Notice_CaptureBusy">Capture in progress. Please try again later.</sys:String>
+    <sys:String x:Key="Pin_Notice_PinShownClipboardBusy">Pin displayed, but clipboard is still busy</sys:String>
+    <sys:String x:Key="Pin_Notice_PinShownClipboardUnsafe">Pin displayed, but unable to safely write to clipboard</sys:String>
+    <sys:String x:Key="Pin_Notice_PinShownClipboardCopyFailed">Pin displayed, but failed to copy to clipboard</sys:String>
+    <sys:String x:Key="Pin_Notice_GestureCaptureFailed">Gesture region capture failed</sys:String>
+
+    <!-- HotkeyService -->
+    <sys:String x:Key="Hotkey_Reject_Empty">Hotkey cannot be empty</sys:String>
+    <sys:String x:Key="Hotkey_Reject_Reserved_Format">"{0}" is a system-reserved hotkey. Please choose another combo.</sys:String>
+    <sys:String x:Key="Hotkey_Reject_InvalidFormat">Invalid hotkey format. Please enter a valid key combo.</sys:String>
+
+    <!-- PinSettingsWindow C# -->
+    <sys:String x:Key="PinSettings_Err_NeedModifier">Hotkey requires at least one modifier key</sys:String>
+    <sys:String x:Key="PinSettings_Err_EmptyHotkeys">Both pin hotkeys are required</sys:String>
+    <sys:String x:Key="PinSettings_Err_SameHotkeys">The two pin hotkeys cannot be the same</sys:String>
+    <sys:String x:Key="PinSettings_Err_ToggleConflict">Pin toggle hotkey cannot be the same as region capture or clipboard hotkey</sys:String>
+
+    <!-- ExecutorService -->
+    <sys:String x:Key="Executor_Err_ProcessStartNull">Failed to start process (returned null)</sys:String>
+    <sys:String x:Key="Executor_Err_ExitCodeStderr_Format">Exit code {0}, error output: {1}</sys:String>
+    <sys:String x:Key="Executor_Err_ExitCode_Format">Exit code {0} (non-zero)</sys:String>
+
+    <!-- SettingsService -->
+    <sys:String x:Key="Settings_Portable_Enabled">Portable mode enabled (config will be saved in app folder). Restart Vector to apply.</sys:String>
+    <sys:String x:Key="Settings_Portable_Disabled">Portable mode disabled (config will be saved in user folder). Restart Vector to apply.</sys:String>
+    <sys:String x:Key="Settings_Portable_SwitchFailed_Format">Switch failed: {0}</sys:String>
 </ResourceDictionary>
