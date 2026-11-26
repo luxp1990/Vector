@@ -572,6 +572,16 @@ public sealed class VectorController : IVectorController, IDisposable
         _ = _settingsService.SaveAsync(_settings);
     }
 
+    public void SetMcpEnabled(bool enabled)
+    {
+        if (enabled == _settings.McpEnabled)
+            return;
+
+        _settings.McpEnabled = enabled;
+        _ = _settingsService.LogAsync($"MCP server {(enabled ? "enabled" : "disabled")}");
+        _ = _settingsService.SaveAsync(_settings);
+    }
+
     public void SetLanguage(string language)
     {
         if (string.Equals(language, _settings.Language, StringComparison.Ordinal))
