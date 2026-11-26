@@ -109,7 +109,8 @@
                                    Foreground="{DynamicResource TextBrush}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock Text="快捷键助手"
+                    <TextBlock Text="{DynamicResource Sidebar_Subtitle}"
+                               TextWrapping="Wrap"
                                FontSize="12"
                                Foreground="{DynamicResource TextMutedBrush}"
                                Margin="40,0,0,0"/>
@@ -129,10 +130,11 @@
                                   HorizontalScrollBarVisibility="Disabled"
                                   CanContentScroll="True">
                     <StackPanel>
-                        <TextBlock Text="全局开关"
+                        <TextBlock Text="{DynamicResource Global_Section_Title}"
+                                   TextWrapping="Wrap"
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextBrush}"/>
-                        <TextBlock Text="临时暂停 / 恢复当前手动启用的功能（未设置则留空）"
+                        <TextBlock Text="{DynamicResource Global_Section_Desc}"
                                    TextWrapping="Wrap"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextMutedBrush}"
@@ -141,14 +143,14 @@
                         <!-- 全局热键输入框：未设置时为空，勿假显示默认组合 -->
                         <TextBox x:Name="TxtGlobalKey"
                                  Text=""
-                                 ToolTip="点击后按下组合键；留空并保存可关闭全局开关热键。手动关闭的功能不会被此键开启。"
+                                 ToolTip="{DynamicResource Global_Hotkey_Tooltip}"
                                  Style="{StaticResource ModernTextBox}"
                                  Height="36"
                                  PreviewKeyDown="TxtGlobalKey_PreviewKeyDown"/>
 
                         <!-- 保存热键按钮 -->
                         <Button x:Name="BtnSetGlobal"
-                                Content="保存热键"
+                                Content="{DynamicResource Global_SaveHotkey_Btn}"
                                 Style="{StaticResource PrimaryButton}"
                                 Height="36"
                                 Margin="0,12,0,0"
@@ -158,10 +160,11 @@
                         <Border Height="1"
                                 Background="{DynamicResource BorderBrush}"
                                 Margin="0,16,0,14"/>
-                        <TextBlock Text="功能开关"
+                        <TextBlock Text="{DynamicResource Features_Section_Title}"
+                                   TextWrapping="Wrap"
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextBrush}"/>
-                        <TextBlock Text="可分别手动启用；全局开关热键临时暂停当前已启用功能"
+                        <TextBlock Text="{DynamicResource Features_Section_Desc}"
                                    TextWrapping="Wrap"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextMutedBrush}"
@@ -172,7 +175,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="快捷键功能"
+                            <TextBlock Text="{DynamicResource Features_Hotkeys_Label}"
+                                       TextWrapping="Wrap"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextBrush}"
                                        VerticalAlignment="Center"/>
@@ -181,7 +185,7 @@
                                           Style="{StaticResource ToggleSwitch}"
                                           IsChecked="True"
                                           VerticalAlignment="Center"
-                                          ToolTip="手动关闭后，全局开关热键不会重新开启此功能"
+                                          ToolTip="{DynamicResource Features_Hotkeys_Tooltip}"
                                           Checked="TglHotkeys_Changed"
                                           Unchecked="TglHotkeys_Changed"/>
                         </Grid>
@@ -192,10 +196,12 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="截图功能"
+                                <TextBlock Text="{DynamicResource Features_Pin_Label}"
+                                           TextWrapping="Wrap"
                                            FontSize="12"
                                            Foreground="{DynamicResource TextBrush}"/>
-                                <TextBlock Text="手势贴图与截图热键"
+                                <TextBlock Text="{DynamicResource Features_Pin_SubLabel}"
+                                           TextWrapping="Wrap"
                                            FontSize="11"
                                            Foreground="{DynamicResource TextMutedBrush}"/>
                             </StackPanel>
@@ -204,27 +210,28 @@
                                           Style="{StaticResource ToggleSwitch}"
                                           IsChecked="True"
                                           VerticalAlignment="Center"
-                                          ToolTip="手动关闭后，全局开关热键不会重新开启截图功能；已贴出的图片保留"
+                                          ToolTip="{DynamicResource Features_Pin_Tooltip}"
                                           Checked="TglPin_Changed"
                                           Unchecked="TglPin_Changed"/>
                         </Grid>
                         <CheckBox x:Name="ChkHotkeyDiagnostics"
-                                  ToolTip="把热键注册、消息分发和目标启动过程记录到 Vector.log；默认关闭"
+                                  ToolTip="{DynamicResource Settings_Diagnostics_Tooltip}"
                                   Foreground="{DynamicResource TextMutedBrush}"
                                   FontSize="11"
                                   Margin="0,12,0,0"
                                   Checked="ChkHotkeyDiagnostics_Changed"
                                   Unchecked="ChkHotkeyDiagnostics_Changed">
-                            <TextBlock Text="热键诊断模式（排查时开启）" TextWrapping="Wrap"/>
+                            <TextBlock Text="{DynamicResource Settings_Diagnostics_Label}" TextWrapping="Wrap"/>
                         </CheckBox>
                         <CheckBox x:Name="ChkHotkeyCoexistence"
-                                  Content="智能避让前台冲突键"
-                                  ToolTip="微信/QQ/浏览器/Excel等前台激活时，自动临时让渡冲突热键（如Alt+S、Ctrl+1~9），切走立即恢复"
+                                  ToolTip="{DynamicResource Settings_Coexistence_Tooltip}"
                                   Foreground="{DynamicResource TextMutedBrush}"
                                   FontSize="11"
                                   Margin="0,8,0,0"
                                   Checked="ChkHotkeyCoexistence_Changed"
-                                  Unchecked="ChkHotkeyCoexistence_Changed"/>
+                                  Unchecked="ChkHotkeyCoexistence_Changed">
+                            <TextBlock Text="{DynamicResource Settings_Coexistence_Label}" TextWrapping="Wrap"/>
+                        </CheckBox>
 
                         <Border Height="1"
                                 Background="{DynamicResource BorderBrush}"
@@ -236,6 +243,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="{DynamicResource Settings_Language_Label}"
+                                       TextWrapping="Wrap"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextBrush}"
                                        VerticalAlignment="Center"/>
@@ -255,7 +263,8 @@
 
                 <!-- 底部：自启延迟 + 导入 / 导出 -->
                 <StackPanel Grid.Row="2" Margin="16,12,16,16">
-                    <TextBlock Text="开机自启延迟（秒）"
+                    <TextBlock Text="{DynamicResource Settings_StartupDelay_Label}"
+                               TextWrapping="Wrap"
                                FontSize="12"
                                Foreground="{DynamicResource TextMutedBrush}"
                                Margin="0,0,0,6"/>
@@ -263,23 +272,23 @@
                              Style="{StaticResource ModernTextBox}"
                              Height="36"
                              Text="0"
-                             ToolTip="仅「开机启动」生效；手动打开不等待。建议 0～30。"
+                             ToolTip="{DynamicResource Settings_StartupDelay_Tooltip}"
                              Margin="0,0,0,12"
                              LostFocus="TxtStartupDelay_LostFocus"/>
                     <Button x:Name="BtnImport"
-                            Content="导入配置"
+                            Content="{DynamicResource Sidebar_Import_Btn}"
                             Style="{StaticResource SecondaryButton}"
                             Height="36"
                             Margin="0,0,0,8"
                             Click="BtnImport_Click"/>
                     <Button x:Name="BtnExport"
-                            Content="导出配置"
+                            Content="{DynamicResource Sidebar_Export_Btn}"
                             Style="{StaticResource SecondaryButton}"
                             Height="36"
                             Margin="0,0,0,8"
                             Click="BtnExport_Click"/>
                     <Button x:Name="BtnPinSettings"
-                            Content="贴图工具"
+                            Content="{DynamicResource Sidebar_PinTool_Btn}"
                             Style="{StaticResource PrimaryButton}"
                             Height="36"
                             Click="BtnPinSettings_Click"/>
@@ -306,13 +315,13 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0"
-                           Text="我的快捷键"
+                           Text="{DynamicResource Main_Title}"
                            FontSize="20" FontWeight="Bold"
                            Foreground="{DynamicResource TextBrush}"
                            VerticalAlignment="Center"/>
                 <TextBlock x:Name="LblCount"
                            Grid.Column="1"
-                           Text="0 项"
+                           Text="{DynamicResource Main_Count_Initial}"
                            FontSize="13"
                            Foreground="{DynamicResource TextMutedBrush}"
                            Margin="12,0,0,0"
@@ -320,13 +329,13 @@
                 <!-- 撤销按钮（栈空时通过 IsEnabled 控制禁用态） -->
                 <Button x:Name="BtnUndo"
                         Grid.Column="2"
-                        Content="↶ 撤销 (Ctrl+Z)"
+                        Content="{DynamicResource Main_Undo_Btn}"
                         Style="{StaticResource SecondaryButton}"
                         Height="32"
                         Padding="12,4"
                         VerticalAlignment="Center"
                         Click="BtnUndo_Click"
-                        ToolTip="撤销上一步操作"/>
+                        ToolTip="{DynamicResource Main_Undo_Tooltip}"/>
             </Grid>
 
             <!-- 添加快捷键卡片 -->
@@ -339,7 +348,7 @@
                     <DropShadowEffect Color="Black" BlurRadius="8" Opacity="0.25" ShadowDepth="1"/>
                 </Border.Effect>
                 <StackPanel>
-                    <TextBlock Text="添加快捷键"
+                    <TextBlock Text="{DynamicResource AddCard_Title}"
                                FontSize="14" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}"
                                Margin="0,0,0,16"/>
@@ -348,11 +357,11 @@
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="96"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="44"/>
-                            <ColumnDefinition Width="96"/>
-                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
                         <TextBox x:Name="TxtLocalKey"
@@ -365,6 +374,7 @@
 
                         <ComboBox x:Name="CboType"
                                   Grid.Column="1"
+                                  MinWidth="96"
                                   Height="40"
                                   Margin="0,0,8,0"
                                   Style="{StaticResource ModernComboBox}"
@@ -382,7 +392,7 @@
                                  Height="40"
                                  Margin="0,0,8,0"
                                  AllowDrop="True"
-                                 ToolTip="目标路径或网址"
+                                 ToolTip="{DynamicResource AddCard_Target_Tooltip}"
                                  PreviewDrop="TxtTarget_PreviewDrop"
                                  PreviewDragEnter="TxtTarget_PreviewDragEnter"
                                  PreviewDragLeave="TxtTarget_PreviewDragLeave"
@@ -399,7 +409,9 @@
 
                         <Button x:Name="BtnAdd"
                                 Grid.Column="4"
-                                Content="+ 添加"
+                                MinWidth="96"
+                                Padding="12,0"
+                                Content="{DynamicResource AddCard_Add_Btn}"
                                 Style="{StaticResource PrimaryButton}"
                                 Height="40"
                                 Margin="0,0,8,0"
@@ -407,7 +419,9 @@
 
                         <Button x:Name="BtnCancelEdit"
                                 Grid.Column="5"
-                                Content="取消"
+                                MinWidth="80"
+                                Padding="12,0"
+                                Content="{DynamicResource AddCard_Cancel_Btn}"
                                 Style="{StaticResource SecondaryButton}"
                                 Height="40"
                                 Visibility="Collapsed"
@@ -423,7 +437,7 @@
                                 Cursor="Hand"
                                 Padding="0,2"
                                 Click="BtnToggleAdvanced_Click"
-                                ToolTip="命令行参数、工作目录、运行策略">
+                                ToolTip="{DynamicResource AddCard_Advanced_Tooltip}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock x:Name="LblAdvancedArrow"
                                            Text="▸"
@@ -432,7 +446,7 @@
                                            VerticalAlignment="Center"
                                            Margin="0,0,6,0"/>
                                 <TextBlock x:Name="LblAdvancedTitle"
-                                           Text="高级选项"
+                                           Text="{DynamicResource AddCard_Advanced_Title}"
                                            FontSize="12"
                                            Foreground="{DynamicResource TextMutedBrush}"
                                            VerticalAlignment="Center"/>
@@ -452,13 +466,13 @@
                                      Style="{StaticResource ModernTextBox}"
                                      Height="36"
                                      Margin="0,0,8,0"
-                                     ToolTip="命令行参数（可选）"/>
+                                     ToolTip="{DynamicResource AddCard_Args_Tooltip}"/>
                             <TextBox x:Name="TxtWorkingDir"
                                      Grid.Column="1"
                                      Style="{StaticResource ModernTextBox}"
                                      Height="36"
                                      Margin="0,0,8,0"
-                                     ToolTip="工作目录（可选，默认程序所在目录）"
+                                     ToolTip="{DynamicResource AddCard_WorkingDir_Tooltip}"
                                      AllowDrop="True"
                                      PreviewDrop="TxtWorkingDir_PreviewDrop"
                                      PreviewDragOver="TxtTarget_PreviewDragOver"/>
@@ -467,16 +481,17 @@
                                       Height="36"
                                       Style="{StaticResource ModernComboBox}"
                                       SelectedIndex="1"
-                                      ToolTip="运行策略（仅程序）">
-                                <ComboBoxItem Content="始终新开" Tag="New"/>
-                                <ComboBoxItem Content="已开则前置" Tag="Activate"/>
-                                <ComboBoxItem Content="切换显示" Tag="Toggle"/>
+                                      ToolTip="{DynamicResource AddCard_RunStrategy_Tooltip}">
+                                <ComboBoxItem Content="{DynamicResource RunStrategy_New}" Tag="New"/>
+                                <ComboBoxItem Content="{DynamicResource RunStrategy_Activate}" Tag="Activate"/>
+                                <ComboBoxItem Content="{DynamicResource RunStrategy_Toggle}" Tag="Toggle"/>
                             </ComboBox>
                         </Grid>
                     </StackPanel>
 
                     <TextBlock x:Name="LblEditTip"
-                               Text="编辑模式：修改后点击「更新」保存，点击「取消」放弃"
+                               Text="{DynamicResource AddCard_EditTip}"
+                               TextWrapping="Wrap"
                                FontSize="12" FontStyle="Italic"
                                Foreground="{DynamicResource TextMutedBrush}"
                                Margin="0,10,0,0"
@@ -546,14 +561,14 @@
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="140"/>
-                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="Auto" MinWidth="80"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="快捷键"
+                                            <TextBlock Grid.Column="0" Text="{DynamicResource List_Header_Key}"
                                                        FontSize="12" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource TextMutedBrush}"
                                                        VerticalAlignment="Center" Padding="16,0,0,0"/>
-                                            <TextBlock Grid.Column="1" Text="类型"
+                                            <TextBlock Grid.Column="1" Text="{DynamicResource List_Header_Type}"
                                                        FontSize="12" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource TextMutedBrush}"
                                                        VerticalAlignment="Center"
@@ -562,8 +577,8 @@
                                                        Cursor="Hand"
                                                        MouseLeftButtonUp="HeaderType_Click"
                                                        Tag="type_header"
-                                                       ToolTip="点击按类型排序（程序→文件夹→网页），再次点击恢复"/>
-                                            <TextBlock Grid.Column="2" Text="目标"
+                                                       ToolTip="{DynamicResource List_Header_Type_Tooltip}"/>
+                                            <TextBlock Grid.Column="2" Text="{DynamicResource List_Header_Target}"
                                                        FontSize="12" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource TextMutedBrush}"
                                                        VerticalAlignment="Center" Padding="8,0,0,0"/>
@@ -646,7 +661,7 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="140"/>
-                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="Auto" MinWidth="80"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="{Binding Key}"
@@ -676,7 +691,7 @@
                     <!-- 空列表提示 -->
                     <TextBlock x:Name="LblEmptyHint"
                                Grid.Row="1"
-                               Text="暂无快捷键，点击上方「添加」开始配置"
+                               Text="{DynamicResource List_EmptyHint}"
                                FontSize="13"
                                Foreground="{DynamicResource TextFaintBrush}"
                                HorizontalAlignment="Center"
@@ -705,13 +720,13 @@
                                  VerticalAlignment="Center"
                                  Margin="0,0,6,0"/>
                         <TextBlock x:Name="LblStatus"
-                                   Text="监听中"
+                                   Text="{DynamicResource Status_Listening}"
                                    FontSize="12" FontWeight="SemiBold"
                                    Foreground="{DynamicResource SuccessBrush}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Grid.Column="1"
-                               Text="双击编辑 · 右键菜单删除"
+                               Text="{DynamicResource Status_Hint}"
                                FontSize="12"
                                Foreground="{DynamicResource TextMutedBrush}"
                                Margin="16,0,0,0"
