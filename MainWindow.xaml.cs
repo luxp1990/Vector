@@ -22,17 +22,14 @@ public partial class MainWindow : Window
     private static extern bool IsUserAnAdmin();
     private readonly IHotkeyService _hotkeyService;
     private readonly ISettingsService _settingsService;
-    private readonly IExecutorService _executorService;
+    private readonly IVectorController _controller;
     private readonly IFileTypeDetector _fileTypeDetector;
     private readonly IThemeService _themeService;
     private readonly ILanguageService _languageService;
     private readonly IUndoService _undoService;
     private readonly IPinFeatureService _pinFeatureService;
-    private AppSettings _settings = new();
     private int _editingIndex = -1;
-    private bool _isListening = true;
     private bool _isPinActive = true;
-    private bool _hotkeysPausedByGlobal;
     private bool _pinPausedByGlobal;
     private bool _suppressToggleSync = false;      // 程序性同步开关状态时抑制事件
     private bool _reallyExit = false;                   // Bug 11: 退出标志位
@@ -68,7 +65,7 @@ public partial class MainWindow : Window
     public MainWindow(
         IHotkeyService hotkeyService,
         ISettingsService settingsService,
-        IExecutorService executorService,
+        IVectorController controller,
         IFileTypeDetector fileTypeDetector,
         IThemeService themeService,
         ILanguageService languageService,
@@ -77,7 +74,7 @@ public partial class MainWindow : Window
     {
         _hotkeyService = hotkeyService;
         _settingsService = settingsService;
-        _executorService = executorService;
+        _controller = controller;
         _fileTypeDetector = fileTypeDetector;
         _themeService = themeService;
         _languageService = languageService;
@@ -88,6 +85,8 @@ public partial class MainWindow : Window
         // 撤销栈状态变化时刷新按钮启用态
         _undoService.StateChanged += (_, _) => UpdateUndoButtonState();
         _languageService.LanguageChanged += OnLanguageChanged;
+        _controller.ShortcutsChanged += OnControllerShortcutsChanged;
+        _controller.ListeningChanged += OnControllerListeningChanged;
         UpdateUndoButtonState();
         var cm = new System.Windows.Controls.ContextMenu
         {
@@ -111,38 +110,49 @@ public partial class MainWindow : Window
             var item = LvShortcuts.SelectedItem as ShortcutConfig;
             if (item != null) EnterEditMode(item);
         };
-        _miDelete.Click += (s, e) =>
+        _miDelete.Click += async (s, e) =>
         {
             if (LvShortcuts.SelectedItems.Count == 0) return;
             var selectedConfigs = LvShortcuts.SelectedItems
                 .Cast<ShortcutConfig>()
                 .ToList();
-            // ✅ Undo: 删除前记录快照（包含选中数与首个目标 key 的描述）
-            var desc = selectedConfigs.Count == 1
-                ? _languageService.Format("Undo_Desc_DeleteSingle", selectedConfigs[0].Key)
-                : _languageService.Format("Undo_Desc_DeleteMultiple", selectedConfigs.Count);
-            _undoService.Record(_settings.LocalShortcuts, UndoOperationType.Delete, desc);
-            _hotkeyService.UnregisterAll();
             foreach (var cfg in selectedConfigs)
-            {
-                LocalShortcuts.Remove(cfg);
-                _settings.LocalShortcuts.Remove(cfg);
                 _originalOrder?.Remove(cfg);
-            }
-            var failedKeys = _isListening
-                ? _hotkeyService.RegisterAll(_settings.LocalShortcuts)
-                : new List<string>();
+            var failedKeys = await _controller.DeleteShortcutsAsync(selectedConfigs);
             if (failedKeys.Count > 0)
                 System.Windows.MessageBox.Show(
                     _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
                     _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
-            _ = _settingsService.SaveAsync(_settings);
-            LblCount.Text = _languageService.Format("Main_Count_Format", _settings.LocalShortcuts.Count);
-            LblEmptyHint.Visibility = LocalShortcuts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             // ✅ Bug N2: 删除后直接退出编辑模式，避免 _editingIndex 指向错误项目
             if (_editingIndex >= 0)
                 BtnCancelEdit_Click(null!, null!);
         };
+    }
+
+    private void OnControllerShortcutsChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
+        if (Dispatcher.CheckAccess())
+            RefreshListView();
+        else
+            Dispatcher.BeginInvoke(new Action(RefreshListView));
+    }
+
+    private void OnControllerListeningChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
+        void Sync()
+        {
+            _suppressToggleSync = true;
+            if (TglHotkeys != null)
+                TglHotkeys.IsChecked = _controller.Settings.HotkeysEnabled;
+            _suppressToggleSync = false;
+            UpdateStatusUi();
+        }
+        if (Dispatcher.CheckAccess())
+            Sync();
+        else
+            Dispatcher.BeginInvoke(new Action(Sync));
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
@@ -177,12 +187,7 @@ public partial class MainWindow : Window
         _hotkeyService.Initialize(_hwnd);
         _hotkeyService.ToggleListening += OnToggleListening;
         // Bug 4: 用字段保存委托引用，确保能正确取消
-        _executeShortcutHandler = cfg =>
-        {
-            if (_settings.HotkeyDiagnosticsEnabled)
-                _ = _settingsService.LogAsync($"Hotkey callback dispatched: key={cfg.Key}; target={cfg.Target}");
-            _executorService.Execute(cfg);
-        };
+        _executeShortcutHandler = cfg => _controller.Execute(cfg);
         _hotkeyService.ExecuteShortcut += _executeShortcutHandler;
         _pinHotkeyHandler = action => Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -196,51 +201,31 @@ public partial class MainWindow : Window
         _hotkeyService.PinToggleHotkeyTriggered += OnPinToggleHotkeyTriggered;
         _pinFeatureService.NoticeRequested += OnPinNoticeRequested;
         // ✅ 1.0.1: 订阅脚本执行失败事件，弹气泡通知用户
-        _executorService.ExecuteFailed += OnShortcutExecuteFailed;
+        _controller.ExecuteFailed += OnShortcutExecuteFailed;
         try
         {
-            _settings = await _settingsService.LoadAsync();
-            _hotkeyService.LogInternalHotkeyConflicts(
-                _settings.LocalShortcuts,
-                _settings.GlobalHotKey,
-                _settings.Pin?.SnapshotHotkey,
-                _settings.Pin?.ClipboardHotkey,
-                _settings.Pin?.ToggleHotkey,
-                "startup");
+            var failedKeys = await _controller.LoadAsync();
+            var settings = _controller.Settings;
             // ✅ 1.0.8: 先检查注册，再赋值文本框（避免失败后 UI 与实际状态不一致）
-            if (_settings.GlobalHotKey != "None" && !_hotkeyService.RegisterGlobal(_settings.GlobalHotKey))
-            {
-                _settings.GlobalHotKey = "None";
-                await _settingsService.SaveAsync(_settings);
-            }
-            TxtGlobalKey.Text = _settings.GlobalHotKey == "None" ? "" : _settings.GlobalHotKey;
-            TxtStartupDelay.Text = Math.Clamp(_settings.StartupDelaySeconds, 0, 120).ToString();
+            TxtGlobalKey.Text = settings.GlobalHotKey == "None" ? "" : settings.GlobalHotKey;
+            TxtStartupDelay.Text = Math.Clamp(settings.StartupDelaySeconds, 0, 120).ToString();
             // 功能开关：快捷键与截图相互独立，按持久化状态恢复
-            _settings.Pin ??= new PinSettings();
-            _settings.Coexistence ??= new HotkeyCoexistenceSettings();
-            _isListening = _settings.HotkeysEnabled;
-            _isPinActive = _settings.Pin.Enabled;
-            _hotkeysPausedByGlobal = false;
+            _isPinActive = settings.Pin.Enabled;
             _pinPausedByGlobal = false;
-            _hotkeyService.SetDiagnosticLogging(_settings.HotkeyDiagnosticsEnabled);
-            _executorService.SetDiagnosticLogging(_settings.HotkeyDiagnosticsEnabled);
             _suppressToggleSync = true;
-            TglHotkeys.IsChecked = _isListening;
-            TglPin.IsChecked = _settings.Pin.Enabled;
-            ChkHotkeyDiagnostics.IsChecked = _settings.HotkeyDiagnosticsEnabled;
-            ChkHotkeyCoexistence.IsChecked = _settings.Coexistence.Enabled;
-            CboLanguage.SelectedIndex = string.Equals(_settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            TglHotkeys.IsChecked = _controller.IsListening;
+            TglPin.IsChecked = settings.Pin.Enabled;
+            ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
+            ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
+            CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             _suppressToggleSync = false;
-            var failedKeys = _isListening
-                ? _hotkeyService.RegisterAll(_settings.LocalShortcuts)
-                : new List<string>();
             if (failedKeys.Count > 0)
                 System.Windows.MessageBox.Show(
                     _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
                     _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
             // 应用持久化的主题与语言（必须在 RefreshListView 之前）
-            _themeService.Apply(_settings.Theme != "Light");
-            _languageService.Apply(_settings.Language);
+            _themeService.Apply(settings.Theme != "Light");
+            _languageService.Apply(settings.Language);
             RefreshListView();
         }
         catch (Exception ex)
@@ -249,8 +234,8 @@ public partial class MainWindow : Window
                 _languageService.Format("Msg_InitFailed_Format", ex.Message),
                 _languageService.GetString("Common_Error"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
-            _settings = new AppSettings();
-            _languageService.Apply(_settings.Language);
+            _controller.ResetToDefaultSettings();
+            _languageService.Apply(_controller.Settings.Language);
             RefreshListView();
         }
         InitializePinFeatures();
@@ -277,6 +262,8 @@ public partial class MainWindow : Window
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         _languageService.LanguageChanged -= OnLanguageChanged;
+        _controller.ShortcutsChanged -= OnControllerShortcutsChanged;
+        _controller.ListeningChanged -= OnControllerListeningChanged;
         _hotkeyService.UnregisterAll();
         _hotkeyService.UnregisterPinHotkeys();
         _hotkeyService.UnregisterPinToggleHotkey();
@@ -287,7 +274,7 @@ public partial class MainWindow : Window
         _hotkeyService.PinHotkeyTriggered -= _pinHotkeyHandler;
         _hotkeyService.PinToggleHotkeyTriggered -= OnPinToggleHotkeyTriggered;
         _pinFeatureService.NoticeRequested -= OnPinNoticeRequested;
-        _executorService.ExecuteFailed -= OnShortcutExecuteFailed;  // ✅ 1.0.1: 避免事件持有已关闭窗口
+        _controller.ExecuteFailed -= OnShortcutExecuteFailed;  // ✅ 1.0.1: 避免事件持有已关闭窗口
         if (_trayIcon != null)
         {
             _trayIcon.Visible = false;
@@ -300,21 +287,21 @@ public partial class MainWindow : Window
 
     private void InitializePinFeatures()
     {
-        _settings.Pin ??= new PinSettings();
+        var pin = _controller.Settings.Pin ??= new PinSettings();
         try
         {
-            _pinFeatureService.Initialize(_settings.Pin);
+            _pinFeatureService.Initialize(pin);
             // 功能开关解耦：截图功能只受截图开关控制
             _pinFeatureService.SetEnabled(_isPinActive);
             if (_isPinActive
                 && !_hotkeyService.RegisterPinHotkeys(
-                    _settings.Pin.SnapshotHotkey,
-                    _settings.Pin.ClipboardHotkey))
+                    pin.SnapshotHotkey,
+                    pin.ClipboardHotkey))
             {
                 OnPinNoticeRequested(_languageService.GetString("Msg_PinHotkeyRegisterFailed"));
             }
-            if (!string.IsNullOrWhiteSpace(_settings.Pin.ToggleHotkey)
-                && !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey))
+            if (!string.IsNullOrWhiteSpace(pin.ToggleHotkey)
+                && !_hotkeyService.RegisterPinToggleHotkey(pin.ToggleHotkey))
             {
                 OnPinNoticeRequested(_languageService.GetString("Msg_PinToggleHotkeyRegisterFailed"));
             }
@@ -358,40 +345,24 @@ public partial class MainWindow : Window
         if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
         try
         {
-            // 关键修复：清除旧的已注册状态缓存，强制向操作系统重新发起 RegisterHotKey 系统调用
-            _hotkeyService.ResetNativeRegistrations();
-
-            _hotkeyService.LogInternalHotkeyConflicts(
-                _settings.LocalShortcuts,
-                _settings.GlobalHotKey,
-                _settings.Pin?.SnapshotHotkey,
-                _settings.Pin?.ClipboardHotkey,
-                _settings.Pin?.ToggleHotkey,
-                "resume");
-
-            if (_settings.GlobalHotKey != "None")
-                _hotkeyService.RegisterGlobal(_settings.GlobalHotKey);
-
-            if (_isListening)
+            var failed = _controller.ReregisterShortcutsAfterResume();
+            if (failed.Count > 0)
             {
-                var failed = _hotkeyService.RegisterAll(_settings.LocalShortcuts);
-                if (failed.Count > 0)
-                {
-                    System.Windows.MessageBox.Show(
-                        _languageService.Format("Msg_ResumeHotkeysRegisterFailed_Format", string.Join("\n", failed)),
-                        _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
+                System.Windows.MessageBox.Show(
+                    _languageService.Format("Msg_ResumeHotkeysRegisterFailed_Format", string.Join("\n", failed)),
+                    _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
+            var pin = _controller.Settings.Pin;
             // 功能开关解耦：截图重注册只看截图开关
             if (_isPinActive
                 && !_hotkeyService.RegisterPinHotkeys(
-                    _settings.Pin.SnapshotHotkey,
-                    _settings.Pin.ClipboardHotkey))
+                    pin.SnapshotHotkey,
+                    pin.ClipboardHotkey))
                 OnPinNoticeRequested(_languageService.GetString("Msg_ResumePinHotkeyFailed"));
 
-            if (!string.IsNullOrWhiteSpace(_settings.Pin?.ToggleHotkey)
-                && !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey))
+            if (!string.IsNullOrWhiteSpace(pin?.ToggleHotkey)
+                && !_hotkeyService.RegisterPinToggleHotkey(pin.ToggleHotkey))
                 OnPinNoticeRequested(_languageService.GetString("Msg_ResumePinToggleFailed"));
 
             // 恢复后立即强制刷新并与当前前台进程重新评估避让（即时检测，无需等待300ms轮询）
@@ -406,50 +377,31 @@ public partial class MainWindow : Window
     {
         // 全局快捷键只暂停/恢复界面手动启用的功能，不修改持久化开关。
         if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
-        bool anyActive = (_settings.HotkeysEnabled && !_hotkeysPausedByGlobal)
-            || (_settings.Pin.Enabled && !_pinPausedByGlobal);
-        _hotkeysPausedByGlobal = anyActive && _settings.HotkeysEnabled;
-        _pinPausedByGlobal = anyActive && _settings.Pin.Enabled;
-        ApplyEffectiveFeatureStates();
-    }
-
-    private void ApplyEffectiveFeatureStates(bool announceFailures = true)
-    {
-        _isListening = _settings.HotkeysEnabled && !_hotkeysPausedByGlobal;
-        _isPinActive = _settings.Pin.Enabled && !_pinPausedByGlobal;
-        ApplyHotkeyState();
-        ApplyPinState(announceFailures);
-    }
-
-    /// <summary>切换快捷键功能后统一应用：注册或注销本地热键并刷新状态。</summary>
-    private void ApplyHotkeyState()
-    {
-        if (_isListening)
+        var settings = _controller.Settings;
+        bool anyActive = (settings.HotkeysEnabled && !_controller.HotkeysPausedByGlobal)
+            || (settings.Pin.Enabled && !_pinPausedByGlobal);
+        _pinPausedByGlobal = anyActive && settings.Pin.Enabled;
+        var failedKeys = _controller.SetHotkeysPausedByGlobal(anyActive && settings.HotkeysEnabled);
+        if (failedKeys.Count > 0)
         {
-            var failedKeys = _hotkeyService.RegisterAll(_settings.LocalShortcuts);
-            if (failedKeys.Count > 0)
-            {
-                System.Windows.MessageBox.Show(
-                    _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
-                    _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+            System.Windows.MessageBox.Show(
+                _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
+                _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        else
-        {
-            _hotkeyService.UnregisterAll();
-        }
-        UpdateStatusUi();
+        _isPinActive = settings.Pin.Enabled && !_pinPausedByGlobal;
+        ApplyPinState();
     }
 
     /// <summary>切换截图功能后统一应用：注册或注销贴图热键并刷新状态。</summary>
     private void ApplyPinState(bool announceFailures = true)
     {
+        var pin = _controller.Settings.Pin;
         if (_isPinActive)
         {
             _pinFeatureService.SetEnabled(true);
             if (!_hotkeyService.RegisterPinHotkeys(
-                    _settings.Pin.SnapshotHotkey,
-                    _settings.Pin.ClipboardHotkey)
+                    pin.SnapshotHotkey,
+                    pin.ClipboardHotkey)
                 && announceFailures)
             {
                 OnPinNoticeRequested(_languageService.GetString("Msg_PinHotkeyRegisterFailed"));
@@ -466,8 +418,9 @@ public partial class MainWindow : Window
     /// <summary>两个功能开关组合出的状态文案。</summary>
     private string CurrentStatusText()
     {
-        bool hk = _isListening, pin = _isPinActive;
-        bool manualHk = _settings.HotkeysEnabled, manualPin = _settings.Pin.Enabled;
+        var settings = _controller.Settings;
+        bool hk = _controller.IsListening, pin = _isPinActive;
+        bool manualHk = settings.HotkeysEnabled, manualPin = settings.Pin.Enabled;
         if (hk && pin) return _languageService.GetString("Status_Listening");
         if (!hk && !pin)
         {
@@ -494,7 +447,8 @@ public partial class MainWindow : Window
     private void UpdateStatusUi()
     {
         if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
-        bool hk = _isListening, pin = _isPinActive;
+        var settings = _controller.Settings;
+        bool hk = _controller.IsListening, pin = _isPinActive;
         string text = CurrentStatusText();
         var brush = (hk && pin)
             ? (System.Windows.Media.Brush)FindResource("SuccessBrush")
@@ -511,7 +465,7 @@ public partial class MainWindow : Window
         }
         if (_toggleListenItem != null)
         {
-            bool anyManuallyEnabled = _settings.HotkeysEnabled || _settings.Pin.Enabled;
+            bool anyManuallyEnabled = settings.HotkeysEnabled || settings.Pin.Enabled;
             _toggleListenItem.Enabled = anyManuallyEnabled;
             _toggleListenItem.Text = (hk || pin)
                 ? _languageService.GetString("Tray_Menu_PauseActive")
@@ -520,21 +474,24 @@ public partial class MainWindow : Window
                     : _languageService.GetString("Tray_Menu_AllDisabled");
         }
         if (_togglePinItem != null)
-            _togglePinItem.Text = _settings.Pin.Enabled
+            _togglePinItem.Text = settings.Pin.Enabled
                 ? _languageService.GetString("Tray_Menu_DisablePin")
                 : _languageService.GetString("Tray_Menu_EnablePin");
     }
 
-    private void TglHotkeys_Changed(object sender, RoutedEventArgs e)
+    private async void TglHotkeys_Changed(object sender, RoutedEventArgs e)
     {
         if (_suppressToggleSync) return;
         if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
         bool enable = TglHotkeys.IsChecked == true;
-        if (enable == _settings.HotkeysEnabled) return;
-        _settings.HotkeysEnabled = enable;
-        _hotkeysPausedByGlobal = false;
-        _ = _settingsService.SaveAsync(_settings);
-        ApplyEffectiveFeatureStates();
+        if (enable == _controller.Settings.HotkeysEnabled) return;
+        var failedKeys = await _controller.SetListeningAsync(enable);
+        if (failedKeys.Count > 0)
+        {
+            System.Windows.MessageBox.Show(
+                _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
+                _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void TglPin_Changed(object sender, RoutedEventArgs e)
@@ -542,7 +499,7 @@ public partial class MainWindow : Window
         if (_suppressToggleSync) return;
         if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
         bool enable = sender == _togglePinItem
-            ? !_settings.Pin.Enabled          // 托盘菜单点击：翻转当前状态
+            ? !_controller.Settings.Pin.Enabled          // 托盘菜单点击：翻转当前状态
             : TglPin.IsChecked == true;       // 主界面开关点击
         SetPinEnabled(enable);
     }
@@ -553,7 +510,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(new Action(() =>
         {
             if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
-            SetPinEnabled(!_settings.Pin.Enabled);
+            SetPinEnabled(!_controller.Settings.Pin.Enabled);
         }));
     }
 
@@ -563,40 +520,27 @@ public partial class MainWindow : Window
         _suppressToggleSync = true;
         TglPin.IsChecked = enable;
         _suppressToggleSync = false;
-        if (enable == _settings.Pin.Enabled) return;
-        _settings.Pin.Enabled = enable;
+        var pin = _controller.Settings.Pin;
+        if (enable == pin.Enabled) return;
+        pin.Enabled = enable;
         _pinPausedByGlobal = false;
-        _ = _settingsService.SaveAsync(_settings);
-        ApplyEffectiveFeatureStates();
+        _ = _controller.SaveSettingsAsync();
+        _isPinActive = pin.Enabled && !_pinPausedByGlobal;
+        ApplyPinState();
     }
 
     private void ChkHotkeyDiagnostics_Changed(object sender, RoutedEventArgs e)
     {
         if (_suppressToggleSync || Dispatcher == null || Dispatcher.HasShutdownStarted)
             return;
-        bool enabled = ChkHotkeyDiagnostics.IsChecked == true;
-        if (enabled == _settings.HotkeyDiagnosticsEnabled)
-            return;
-
-        _settings.HotkeyDiagnosticsEnabled = enabled;
-        _hotkeyService.SetDiagnosticLogging(enabled);
-        _executorService.SetDiagnosticLogging(enabled);
-        _ = _settingsService.LogAsync($"Hotkey diagnostic logging {(enabled ? "enabled" : "disabled")}");
-        _ = _settingsService.SaveAsync(_settings);
+        _controller.SetDiagnosticLogging(ChkHotkeyDiagnostics.IsChecked == true);
     }
 
     private void ChkHotkeyCoexistence_Changed(object sender, RoutedEventArgs e)
     {
         if (_suppressToggleSync || Dispatcher == null || Dispatcher.HasShutdownStarted)
             return;
-        bool enabled = ChkHotkeyCoexistence.IsChecked == true;
-        _settings.Coexistence ??= new HotkeyCoexistenceSettings();
-        if (enabled == _settings.Coexistence.Enabled)
-            return;
-
-        _settings.Coexistence.Enabled = enabled;
-        _ = _settingsService.LogAsync($"Hotkey coexistence {(enabled ? "enabled" : "disabled")}");
-        _ = _settingsService.SaveAsync(_settings);
+        _controller.SetCoexistenceEnabled(ChkHotkeyCoexistence.IsChecked == true);
         _foregroundMonitor?.TriggerCurrent();
     }
 
@@ -606,153 +550,11 @@ public partial class MainWindow : Window
             return;
         if (CboLanguage.SelectedItem is not ComboBoxItem item || item.Tag is not string lang)
             return;
-        if (string.Equals(lang, _settings.Language, StringComparison.Ordinal))
-            return;
-
-        _settings.Language = lang;
-        _languageService.Apply(lang);
-        _ = _settingsService.SaveAsync(_settings);
+        _controller.SetLanguage(lang);
     }
 
     private void OnForegroundProcessChanged(string processName, bool isFullscreen)
-    {
-        if (_settings?.Coexistence == null)
-            return;
-
-        var activeChords = new List<string>();
-        if (_settings.LocalShortcuts != null)
-        {
-            foreach (var sc in _settings.LocalShortcuts)
-            {
-                if (!string.IsNullOrWhiteSpace(sc?.Key))
-                    activeChords.Add(sc.Key);
-            }
-        }
-        if (_settings.Pin != null)
-        {
-            if (!string.IsNullOrWhiteSpace(_settings.Pin.SnapshotHotkey))
-                activeChords.Add(_settings.Pin.SnapshotHotkey);
-            if (!string.IsNullOrWhiteSpace(_settings.Pin.ClipboardHotkey))
-                activeChords.Add(_settings.Pin.ClipboardHotkey);
-        }
-
-        var (passthrough, reason) = HotkeyPassthroughPolicy.Evaluate(
-            processName,
-            isFullscreen,
-            _settings.Coexistence,
-            activeChords,
-            _settings.GlobalHotKey);
-
-        if (_settings.HotkeyDiagnosticsEnabled)
-        {
-            if (!string.IsNullOrEmpty(reason))
-                _ = _settingsService.LogAsync($"[Coexistence] {reason} (active foreground: '{processName}')");
-            else
-                _ = _settingsService.LogAsync($"[Foreground] Active: '{processName}' (isFullscreen={isFullscreen})");
-        }
-
-        _hotkeyService.SetPassthroughSignatures(passthrough);
-    }
-
-    private string? FindHotkeyConflict(
-        string key,
-        int? ignoredLocalIndex = null,
-        bool ignoreGlobal = false,
-        PinSettings? pinSettings = null,
-        string? ignoredPinKey = null)
-    {
-        if (!HotkeyService.TryGetHotkeySignature(key, out string signature))
-            return _languageService.GetString("Conflict_InvalidFormat");
-
-        for (int i = 0; i < _settings.LocalShortcuts.Count; i++)
-        {
-            if (i == ignoredLocalIndex)
-                continue;
-            if (HotkeyService.TryGetHotkeySignature(_settings.LocalShortcuts[i].Key, out string other)
-                && other == signature)
-                return _languageService.Format("Conflict_LocalUsed_Format", _settings.LocalShortcuts[i].Key);
-        }
-
-        if (!ignoreGlobal
-            && !string.IsNullOrWhiteSpace(_settings.GlobalHotKey)
-            && !string.Equals(_settings.GlobalHotKey, "None", StringComparison.OrdinalIgnoreCase)
-            && HotkeyService.TryGetHotkeySignature(_settings.GlobalHotKey, out string global)
-            && global == signature)
-            return _languageService.GetString("Conflict_GlobalUsed");
-
-        PinSettings pins = pinSettings ?? _settings.Pin;
-        if (ignoredPinKey != "snapshot"
-            && HotkeyService.TryGetHotkeySignature(pins.SnapshotHotkey, out string snapshot)
-            && snapshot == signature)
-            return _languageService.GetString("Conflict_PinSnapshotUsed");
-        if (ignoredPinKey != "clipboard"
-            && HotkeyService.TryGetHotkeySignature(pins.ClipboardHotkey, out string clipboard)
-            && clipboard == signature)
-            return _languageService.GetString("Conflict_PinClipboardUsed");
-        if (ignoredPinKey != "toggle"
-            && !string.IsNullOrWhiteSpace(pins.ToggleHotkey)
-            && HotkeyService.TryGetHotkeySignature(pins.ToggleHotkey, out string toggle)
-            && toggle == signature)
-            return _languageService.GetString("Conflict_PinToggleUsed");
-
-        return null;
-    }
-
-    private string? ValidateImportedSettings(AppSettings imported)
-    {
-        var entries = new List<(string Label, string Key)>();
-
-        if (imported.LocalShortcuts != null)
-        {
-            foreach (var shortcut in imported.LocalShortcuts)
-                entries.Add((_languageService.GetString("Label_LocalShortcut"), shortcut?.Key ?? string.Empty));
-        }
-
-        if (!string.IsNullOrWhiteSpace(imported.GlobalHotKey)
-            && !string.Equals(imported.GlobalHotKey, "None", StringComparison.OrdinalIgnoreCase))
-        {
-            entries.Add((_languageService.GetString("Label_GlobalHotkey"), imported.GlobalHotKey));
-        }
-
-        PinSettings pin = imported.Pin ?? new PinSettings();
-        bool hasSnapshot = !string.IsNullOrWhiteSpace(pin.SnapshotHotkey);
-        bool hasClipboard = !string.IsNullOrWhiteSpace(pin.ClipboardHotkey);
-        if (hasSnapshot != hasClipboard)
-        {
-            string missingLabel = hasSnapshot
-                ? _languageService.GetString("Label_PinClipboardHotkey")
-                : _languageService.GetString("Label_PinSnapshotHotkey");
-            return _languageService.Format("Import_PinIncomplete_Format", missingLabel);
-        }
-        if (hasSnapshot && hasClipboard)
-        {
-            entries.Add((_languageService.GetString("Label_PinSnapshotHotkey"), pin.SnapshotHotkey!));
-            entries.Add((_languageService.GetString("Label_PinClipboardHotkey"), pin.ClipboardHotkey!));
-        }
-        if (!string.IsNullOrWhiteSpace(pin.ToggleHotkey)
-            && !string.Equals(pin.ToggleHotkey.Trim(), "None", StringComparison.OrdinalIgnoreCase))
-        {
-            entries.Add((_languageService.GetString("Label_PinToggleHotkey"), pin.ToggleHotkey));
-        }
-
-        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (label, key) in entries)
-        {
-            if (!HotkeyService.TryGetHotkeySignature(key, out string signature))
-                return _languageService.Format("Import_EntryInvalidFormat_Format", label, key);
-
-            string? rejectReason = _hotkeyService.GetHotkeyRejectReason(key);
-            if (rejectReason != null)
-                return _languageService.Format("Import_EntryRejected_Format", label, key, rejectReason);
-
-            if (seen.TryGetValue(signature, out string? existing))
-                return _languageService.Format("Import_EntryConflict_Format", label, key, existing);
-
-            seen[signature] = _languageService.Format("Import_EntryLabel_Format", label, key);
-        }
-
-        return null;
-    }
+        => _controller.EvaluateForegroundPassthrough(processName, isFullscreen);
     private void InitTray()
     {
         _trayIcon = new Forms.NotifyIcon
@@ -783,7 +585,7 @@ public partial class MainWindow : Window
 
         // 暂停/恢复快捷键菜单项
         _toggleListenItem = new Forms.ToolStripMenuItem(
-            (_isListening || _isPinActive)
+            (_controller.IsListening || _isPinActive)
                 ? _languageService.GetString("Tray_Menu_PauseActive")
                 : _languageService.GetString("Tray_Menu_ResumeActive"));
         _toggleListenItem.Click += (s, ev) => OnToggleListening();
@@ -791,7 +593,7 @@ public partial class MainWindow : Window
 
         // 暂停/恢复截图菜单项（与主界面截图开关同步）
         _togglePinItem = new Forms.ToolStripMenuItem(
-            _settings.Pin.Enabled
+            _controller.Settings.Pin.Enabled
                 ? _languageService.GetString("Tray_Menu_DisablePin")
                 : _languageService.GetString("Tray_Menu_EnablePin"));
         _togglePinItem.Click += (s, ev) =>
@@ -807,8 +609,8 @@ public partial class MainWindow : Window
         themeItem.Click += async (s, ev) =>
         {
             _themeService.Toggle();
-            _settings.Theme = _themeService.IsDark ? "Dark" : "Light";
-            await _settingsService.SaveAsync(_settings);
+            _controller.Settings.Theme = _themeService.IsDark ? "Dark" : "Light";
+            await _controller.SaveSettingsAsync();
         };
         menu.Items.Add(themeItem);
         // ✅ 开机自启
@@ -843,7 +645,7 @@ public partial class MainWindow : Window
         {
             if (_trayCheckSuppress) return;
             // 先落盘现行目录，再拷到目标，避免启用便携后重启丢最近改动
-            await _settingsService.SaveAsync(_settings);
+            await _controller.SaveSettingsAsync();
             var msg = SettingsService.PreparePortableModeSwitch(portableItem.Checked, _languageService);
             var actual = AppPaths.IsPortableMode();
             if (portableItem.Checked != actual)
@@ -883,13 +685,13 @@ public partial class MainWindow : Window
         // ✅ 1.0.1: UIPI 缓解入口 — 托盘菜单提供"以管理员模式启动"开关
         var adminItem = new Forms.ToolStripMenuItem(_languageService.GetString("Tray_Menu_RunAsAdmin"))
         {
-            Checked = _settings.RunAsAdmin,
+            Checked = _controller.Settings.RunAsAdmin,
             CheckOnClick = true
         };
         adminItem.CheckedChanged += async (s, ev) =>
         {
-            _settings.RunAsAdmin = adminItem.Checked;
-            await _settingsService.SaveAsync(_settings);
+            _controller.Settings.RunAsAdmin = adminItem.Checked;
+            await _controller.SaveSettingsAsync();
             if (adminItem.Checked && !IsUserAnAdmin())
             {
                 var result = System.Windows.MessageBox.Show(
@@ -1050,40 +852,16 @@ public partial class MainWindow : Window
             }
         }
     }
-    private string GetHotkeyRegisterFailureDetail(string genericDetail)
-    {
-        int errorCode = _hotkeyService.LastRegisterError;
-        return errorCode switch
-        {
-            0 => genericDetail,
-            1409 => _languageService.GetString("Msg_HotkeyOccupied_1409"),
-            _ => _languageService.Format("Msg_HotkeyOccupied_Code_Format", errorCode)
-        };
-    }
-
     private async void BtnSetGlobal_Click(object sender, RoutedEventArgs e)
     {
-        string oldKey = _settings.GlobalHotKey;   // ✅ 1.0.8: 保存旧热键，失败时恢复
-        // 留空 = 关闭全局开关热键
+        string oldKey = _controller.Settings.GlobalHotKey;   // ✅ 1.0.8: 保存旧热键，失败时恢复
         string newKey = string.IsNullOrWhiteSpace(TxtGlobalKey.Text)
             ? "None"
             : TxtGlobalKey.Text.Trim();
-        if (newKey != "None")
+
+        var result = await _controller.SetGlobalHotkeyAsync(newKey);
+        if (result.Success)
         {
-            string? rejectReason = _hotkeyService.GetHotkeyRejectReason(newKey);
-            string? conflict = FindHotkeyConflict(newKey, ignoreGlobal: true);
-            if (rejectReason != null || conflict != null)
-            {
-                System.Windows.MessageBox.Show(rejectReason ?? conflict!, _languageService.GetString("Msg_HotkeyConflictTitle"),
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                TxtGlobalKey.Text = oldKey == "None" ? "" : oldKey;
-                return;
-            }
-        }
-        if (_hotkeyService.RegisterGlobal(newKey))
-        {
-            _settings.GlobalHotKey = newKey;
-            await _settingsService.SaveAsync(_settings);
             TxtGlobalKey.Text = newKey == "None" ? "" : newKey;
             System.Windows.MessageBox.Show(
                 newKey == "None"
@@ -1093,17 +871,11 @@ public partial class MainWindow : Window
         }
         else
         {
-            int errorCode = _hotkeyService.LastRegisterError;
-            string message = errorCode switch
-            {
-                0 => _languageService.GetString("Msg_GlobalRegisterFailed_Generic"),
-                1409 => _languageService.GetString("Msg_GlobalRegisterFailed_1409"),
-                _ => _languageService.Format("Msg_GlobalRegisterFailed_Code_Format", errorCode)
-            };
-            System.Windows.MessageBox.Show(message,
-                _languageService.GetString("Common_Error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(result.ErrorMessage!, result.ErrorTitle!,
+                MessageBoxButton.OK, MessageBoxImage.Warning);
             TxtGlobalKey.Text = oldKey == "None" ? "" : oldKey;
-            TxtGlobalKey.Focus();
+            if (result.FocusInput)
+                TxtGlobalKey.Focus();
         }
     }
 
@@ -1112,7 +884,7 @@ public partial class MainWindow : Window
     private async void OpenPinSettings()
     {
         var dialog = new PinSettingsWindow(
-            _settings.Pin,
+            _controller.Settings.Pin,
             _pinFeatureService.StartRegionCapture,
             _pinFeatureService.PinClipboard,
             _languageService)
@@ -1122,24 +894,24 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() != true)
             return;
 
-        PinSettings oldSettings = _settings.Pin;
+        PinSettings oldSettings = _controller.Settings.Pin;
         PinSettings newSettings = dialog.ResultSettings;
         string? snapshotReject = _hotkeyService.GetHotkeyRejectReason(newSettings.SnapshotHotkey);
         string? clipboardReject = _hotkeyService.GetHotkeyRejectReason(newSettings.ClipboardHotkey);
         string? toggleReject = string.IsNullOrWhiteSpace(newSettings.ToggleHotkey)
             ? null
             : _hotkeyService.GetHotkeyRejectReason(newSettings.ToggleHotkey);
-        string? snapshotConflict = FindHotkeyConflict(
+        string? snapshotConflict = _controller.FindHotkeyConflict(
             newSettings.SnapshotHotkey,
             pinSettings: newSettings,
             ignoredPinKey: "snapshot");
-        string? clipboardConflict = FindHotkeyConflict(
+        string? clipboardConflict = _controller.FindHotkeyConflict(
             newSettings.ClipboardHotkey,
             pinSettings: newSettings,
             ignoredPinKey: "clipboard");
         string? toggleConflict = string.IsNullOrWhiteSpace(newSettings.ToggleHotkey)
             ? null
-            : FindHotkeyConflict(
+            : _controller.FindHotkeyConflict(
                 newSettings.ToggleHotkey,
                 pinSettings: newSettings,
                 ignoredPinKey: "toggle");
@@ -1203,17 +975,17 @@ public partial class MainWindow : Window
         else
             _hotkeyService.UnregisterPinHotkeys();
 
-        _settings.Pin = newSettings;
+        _controller.Settings.Pin = newSettings;
         if (manualPinStateChanged)
             _pinPausedByGlobal = false;
-        _isPinActive = _settings.Pin.Enabled && !_pinPausedByGlobal;
+        _isPinActive = _controller.Settings.Pin.Enabled && !_pinPausedByGlobal;
         _pinFeatureService.UpdateSettings(newSettings);
         _pinFeatureService.SetEnabled(_isPinActive);
         _suppressToggleSync = true;
         TglPin.IsChecked = newSettings.Enabled;
         _suppressToggleSync = false;
         UpdateStatusUi();
-        await _settingsService.SaveAsync(_settings);
+        await _controller.SaveSettingsAsync();
         OnPinNoticeRequested(_languageService.GetString("Msg_PinSettingsSaved"));
     }
 
@@ -1226,119 +998,57 @@ public partial class MainWindow : Window
         TxtTarget.Text = CleanTarget(TxtTarget.Text);
         if (string.IsNullOrWhiteSpace(TxtTarget.Text)) return;
         TxtWorkingDir.Text = CleanTarget(TxtWorkingDir.Text);
-        // ✅ 快捷键黑名单检查（编辑模式如果未改键则跳过）
-        var enteringKey = TxtLocalKey.Text.Trim();
-        var isEditingSameKey = _editingIndex >= 0
-            && _settings.LocalShortcuts[_editingIndex].Key == enteringKey;
-        if (!isEditingSameKey)
-        {
-            var rejectReason = _hotkeyService.GetHotkeyRejectReason(enteringKey);
-            if (rejectReason != null)
-            {
-                System.Windows.MessageBox.Show(rejectReason, _languageService.GetString("Msg_HotkeyUnavailableTitle"),
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-        }
-        string? internalConflict = FindHotkeyConflict(
-            enteringKey,
-            ignoredLocalIndex: _editingIndex >= 0 ? _editingIndex : null);
-        if (internalConflict != null)
-        {
-            System.Windows.MessageBox.Show(internalConflict, _languageService.GetString("Msg_HotkeyConflictTitle"),
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+
         var cfg = new ShortcutConfig
         {
-            Key = enteringKey,
+            Key = TxtLocalKey.Text.Trim(),
             Type = GetSelectedType(),
             Target = TxtTarget.Text,
             Arguments = TxtArguments.Text?.Trim() ?? "",
             WorkingDirectory = TxtWorkingDir.Text?.Trim() ?? "",
             RunStrategy = GetSelectedRunStrategy()
         };
+
+        ShortcutOperationResult result;
         if (_editingIndex >= 0)
         {
-            // 编辑模式：检查与其他项重复
-            for (int i = 0; i < _settings.LocalShortcuts.Count; i++)
+            var oldCfg = _controller.Settings.LocalShortcuts[_editingIndex];
+            result = await _controller.UpdateShortcutAsync(_editingIndex, cfg);
+            if (!result.Success)
             {
-                // ✅ 1.0.8: 用 enteringKey (trimmed) 检查，避免粘贴带空格文本时漏检
-                if (i != _editingIndex && _settings.LocalShortcuts[i].Key == enteringKey)
-                {
-                    System.Windows.MessageBox.Show(_languageService.GetString("Msg_HotkeyInUse"));
-                    return;
-                }
+                if (result.ErrorTitle != null)
+                    System.Windows.MessageBox.Show(result.ErrorMessage!, result.ErrorTitle,
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                else
+                    System.Windows.MessageBox.Show(result.ErrorMessage!);
+                return;
             }
-            // 取旧值（用于失败回滚 + Undo 描述）
-            var oldCfg = _settings.LocalShortcuts[_editingIndex];
-            // ✅ Undo: 先留一份编辑前的列表副本，注册成功后再 Record——
-            // 否则注册失败回滚后会留下一条幽灵撤销记录（Record 内部做深拷贝，传副本即可）
-            var preEditSnapshot = _settings.LocalShortcuts.ToList();
-            _settings.LocalShortcuts[_editingIndex] = cfg;
             if (_originalOrder != null)
             {
                 int origIdx = _originalOrder.IndexOf(oldCfg);
                 if (origIdx >= 0)
-                    _originalOrder[origIdx] = cfg;
+                    _originalOrder[origIdx] = _controller.Settings.LocalShortcuts[_editingIndex];
                 else
                     _originalOrder = null;
             }
-            if (_isListening && !_hotkeyService.RegisterSingle(cfg, _editingIndex + 1))
-            {
-                // RegisterSingle 会先注册新快捷键，再撤销旧映射；失败时旧快捷键仍保持可用。
-                _settings.LocalShortcuts[_editingIndex] = oldCfg;
-                if (_originalOrder != null)
-                {
-                    int origIdx = _originalOrder.IndexOf(cfg);
-                    if (origIdx >= 0)
-                        _originalOrder[origIdx] = oldCfg;
-                    else
-                        _originalOrder = null;
-                }
-                System.Windows.MessageBox.Show(
-                    _languageService.Format("Msg_SingleHotkeyFailed_Format", cfg.Key, GetHotkeyRegisterFailureDetail(_languageService.GetString("Msg_HotkeyOccupied_Generic"))),
-                    _languageService.GetString("Msg_HotkeyRegisterFailedTitle"),
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            _undoService.Record(preEditSnapshot,
-                UndoOperationType.Update, _languageService.Format("Undo_Desc_Edit", oldCfg.Key));
-            // ✅ 1.0.8: 删除死代码 —— cfg 是新实例，IndexOf 用引用比较永远返回 -1
-            // UI 同步由末尾的 RefreshListView() 统一处理
             _editingIndex = -1;
             BtnAdd.Content = _languageService.GetString("AddCard_Add_Btn");
             BtnCancelEdit.Visibility = Visibility.Collapsed;
         }
         else
         {
-            // ✅ 1.0.8: 用 enteringKey (trimmed) 检查，避免粘贴带空格文本时漏检
-            if (_settings.LocalShortcuts.Any(s => s.Key == enteringKey))
+            result = await _controller.AddShortcutAsync(cfg);
+            if (!result.Success)
             {
-                System.Windows.MessageBox.Show(_languageService.GetString("Msg_HotkeyInUse"));
+                if (result.ErrorTitle != null)
+                    System.Windows.MessageBox.Show(result.ErrorMessage!, result.ErrorTitle,
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                else
+                    System.Windows.MessageBox.Show(result.ErrorMessage!);
                 return;
             }
-// ✅ Undo: 先留一份添加前的列表副本，注册成功后再 Record，避免注册失败留下幽灵撤销记录
-            var preAddSnapshot = _settings.LocalShortcuts.ToList();
-            _settings.LocalShortcuts.Add(cfg);
-            _originalOrder?.Add(cfg);
-            // ✅ 修复：不再手动同步 LocalShortcuts，由末尾 RefreshListView() 统一刷新
-            int newId = _settings.LocalShortcuts.Count;
-            if (_isListening && !_hotkeyService.RegisterSingle(cfg, newId))
-            {
-                _settings.LocalShortcuts.RemoveAt(_settings.LocalShortcuts.Count - 1);
-                _originalOrder?.Remove(cfg);
-                System.Windows.MessageBox.Show(
-                    _languageService.Format("Msg_SingleHotkeyFailed_Format", cfg.Key, GetHotkeyRegisterFailureDetail(_languageService.GetString("Msg_HotkeyOccupied_Generic"))),
-                    _languageService.GetString("Msg_HotkeyRegisterFailedTitle"),
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            _undoService.Record(preAddSnapshot,
-                UndoOperationType.Add, _languageService.Format("Undo_Desc_Add", cfg.Key));
+            _originalOrder?.Add(_controller.Settings.LocalShortcuts[^1]);
         }
-        // Bug 6: 删除冗余的 RegisterAll，RegisterSingle 已经完成了注册
-        await _settingsService.SaveAsync(_settings);
         RefreshListView();
         ClearAddForm();
         LblEditTip.Visibility = Visibility.Collapsed;
@@ -1350,7 +1060,7 @@ public partial class MainWindow : Window
         BtnCancelEdit.Visibility = Visibility.Collapsed;
         ClearAddForm();
         LblEditTip.Visibility = Visibility.Collapsed;
-        LblCount.Text = _languageService.Format("Main_Count_Format", _settings.LocalShortcuts.Count);
+        LblCount.Text = _languageService.Format("Main_Count_Format", _controller.Settings.LocalShortcuts.Count);
     }
 
     private void ClearAddForm()
@@ -1428,9 +1138,7 @@ public partial class MainWindow : Window
             sec = 0;
         sec = Math.Clamp(sec, 0, 120);
         TxtStartupDelay.Text = sec.ToString();
-        if (_settings.StartupDelaySeconds == sec) return;
-        _settings.StartupDelaySeconds = sec;
-        await _settingsService.SaveAsync(_settings);
+        await _controller.SetStartupDelayAsync(sec);
     }
 
 
@@ -1512,7 +1220,7 @@ public partial class MainWindow : Window
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "JSON (*.json)|*.json" };
         if (dialog.ShowDialog() == true)
         {
-            var count = _settings.LocalShortcuts?.Count ?? 0;
+            var count = _controller.Settings.LocalShortcuts?.Count ?? 0;
             var confirm = System.Windows.MessageBox.Show(
                 _languageService.Format("Msg_ImportConfirm_Format", count),
                 _languageService.GetString("Msg_ImportConfirmTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
@@ -1520,103 +1228,73 @@ public partial class MainWindow : Window
 
             try
             {
-                var json = await System.IO.File.ReadAllTextAsync(dialog.FileName);
-                var imported = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
-                if (imported != null)
-                {
-                    string? validationError = ValidateImportedSettings(imported);
-                    if (validationError != null)
-                    {
-                        System.Windows.MessageBox.Show(
-                            _languageService.Format("Msg_ImportRejected_Format", validationError),
-                            _languageService.GetString("Msg_ImportFailedTitle"),
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return;
-                    }
+                var result = await _controller.ImportFromFileAsync(dialog.FileName);
+                if (result.CancelledOrEmpty)
+                    return;
 
-                    _hotkeyService.UnregisterAll();
-                    _hotkeyService.UnregisterPinHotkeys();
-                    _hotkeyService.UnregisterPinToggleHotkey();
-                    // Bug 18: 先清除选中状态，避免引用断裂
-                    LvShortcuts.SelectedIndex = -1;
-                    // 导入会整体替换列表：残留的编辑索引会指向新列表的错误项（甚至越界），先退出编辑模式
-                    if (_editingIndex >= 0) BtnCancelEdit_Click(null!, null!);
-                    _settings = imported;
-                    _settings.LocalShortcuts ??= new System.Collections.ObjectModel.ObservableCollection<ShortcutConfig>();
-                    _settings.Pin ??= new PinSettings();
-                    _hotkeysPausedByGlobal = false;
-                    _pinPausedByGlobal = false;
-                    _hotkeyService.SetDiagnosticLogging(_settings.HotkeyDiagnosticsEnabled);
-                    _executorService.SetDiagnosticLogging(_settings.HotkeyDiagnosticsEnabled);
-                    // ✅ 1.0.7 修复: 检查全局热键注册结果。失败时**保留**配置中的 GlobalHotKey 字符串
-                    // （用户的偏好），但 TxtGlobalKey 显示会变成空（运行时未生效）。
-                    string? globalHotkeyFail = null;
-                    // 无论新配置有无全局键，都先走 RegisterGlobal（空/None 会卸载旧键）
-                    if (_settings.GlobalHotKey != "None"
-                        && !string.IsNullOrWhiteSpace(_settings.GlobalHotKey))
-                    {
-                        if (!_hotkeyService.RegisterGlobal(_settings.GlobalHotKey))
-                            globalHotkeyFail = _settings.GlobalHotKey;
-                    }
-                    else
-                    {
-                        _hotkeyService.RegisterGlobal("None");
-                        _settings.GlobalHotKey = "None";
-                    }
-                    // 功能开关解耦：导入后按各自开关恢复
-                    _isListening = _settings.HotkeysEnabled;
-                    _isPinActive = _settings.Pin.Enabled;
-                    var failedKeys = _isListening
-                        ? _hotkeyService.RegisterAll(_settings.LocalShortcuts)
-                        : new List<string>();
-                    bool pinHotkeyFail = _isPinActive
-                        && !_hotkeyService.RegisterPinHotkeys(
-                            _settings.Pin.SnapshotHotkey,
-                            _settings.Pin.ClipboardHotkey);
-                    bool pinToggleFail = !_hotkeyService.RegisterPinToggleHotkey(_settings.Pin.ToggleHotkey);
-                    _pinFeatureService.UpdateSettings(_settings.Pin);
-                    _pinFeatureService.SetEnabled(_isPinActive);
-                    _settings.Coexistence ??= new HotkeyCoexistenceSettings();
-                    _suppressToggleSync = true;
-                    TglHotkeys.IsChecked = _isListening;
-                    TglPin.IsChecked = _settings.Pin.Enabled;
-                    ChkHotkeyDiagnostics.IsChecked = _settings.HotkeyDiagnosticsEnabled;
-                    ChkHotkeyCoexistence.IsChecked = _settings.Coexistence.Enabled;
-                    _suppressToggleSync = false;
-                    UpdateStatusUi();
-                    _foregroundMonitor?.TriggerCurrent();
-                    // Bug 18: 更新全局热键输入框（None → 空，勿假显示默认键）
-                    // 全局键注册失败时运行时未生效，输入框同样显示空（配置字符串本身保留，见上方 1.0.7 注释）
-                    TxtGlobalKey.Text = globalHotkeyFail != null || _settings.GlobalHotKey == "None" ? "" : _settings.GlobalHotKey;
-                    TxtStartupDelay.Text = Math.Clamp(_settings.StartupDelaySeconds, 0, 120).ToString();
-                    // ✅ 1.0.8: 合并为单一消息框，避免双重弹窗
-                    if (failedKeys.Count > 0 || globalHotkeyFail != null || pinHotkeyFail || pinToggleFail)
-                    {
-                        var msg = _languageService.GetString("Msg_ImportPartialSuccess_Base");
-                        if (failedKeys.Count > 0)
-                            msg += _languageService.Format("Msg_ImportPartialSuccess_LocalFail_Format", string.Join("\n", failedKeys));
-                        if (globalHotkeyFail != null)
-                            msg += _languageService.Format("Msg_ImportPartialSuccess_GlobalFail_Format", globalHotkeyFail);
-                        if (pinHotkeyFail)
-                            msg += _languageService.GetString("Msg_ImportPartialSuccess_PinFail");
-                        if (pinToggleFail)
-                            msg += _languageService.GetString("Msg_ImportPartialSuccess_PinToggleFail");
-                        System.Windows.MessageBox.Show(msg, _languageService.GetString("Msg_ImportPartialTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                    else
-                    {
-                        System.Windows.MessageBox.Show(
-                            _languageService.GetString("Msg_ImportSuccess"),
-                            _languageService.GetString("Common_Info"),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    await _settingsService.SaveAsync(_settings);
-                    RefreshListView();
-                    // ✅ Undo: 导入整批配置不属于"单步操作"，清空撤销栈
-                    _undoService.Clear();
-                    UpdateUndoButtonState();
+                if (result.ValidationError != null)
+                {
+                    System.Windows.MessageBox.Show(
+                        _languageService.Format("Msg_ImportRejected_Format", result.ValidationError),
+                        _languageService.GetString("Msg_ImportFailedTitle"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
                 }
+
+                // Bug 18: 先清除选中状态，避免引用断裂
+                LvShortcuts.SelectedIndex = -1;
+                // 导入会整体替换列表：残留的编辑索引会指向新列表的错误项（甚至越界），先退出编辑模式
+                if (_editingIndex >= 0) BtnCancelEdit_Click(null!, null!);
+
+                var settings = _controller.Settings;
+                _pinPausedByGlobal = false;
+                _isPinActive = settings.Pin.Enabled;
+                bool pinHotkeyFail = _isPinActive
+                    && !_hotkeyService.RegisterPinHotkeys(
+                        settings.Pin.SnapshotHotkey,
+                        settings.Pin.ClipboardHotkey);
+                bool pinToggleFail = !_hotkeyService.RegisterPinToggleHotkey(settings.Pin.ToggleHotkey);
+                _pinFeatureService.UpdateSettings(settings.Pin);
+                _pinFeatureService.SetEnabled(_isPinActive);
+
+                _suppressToggleSync = true;
+                TglHotkeys.IsChecked = _controller.IsListening;
+                TglPin.IsChecked = settings.Pin.Enabled;
+                ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
+                ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
+                _suppressToggleSync = false;
+                UpdateStatusUi();
+                _foregroundMonitor?.TriggerCurrent();
+
+                // Bug 18: 更新全局热键输入框（None → 空，勿假显示默认键）
+                TxtGlobalKey.Text = result.GlobalHotkeyFail != null || settings.GlobalHotKey == "None" ? "" : settings.GlobalHotKey;
+                TxtStartupDelay.Text = Math.Clamp(settings.StartupDelaySeconds, 0, 120).ToString();
+
+                var failedKeys = result.FailedLocalKeys ?? Array.Empty<string>();
+                // ✅ 1.0.8: 合并为单一消息框，避免双重弹窗
+                if (failedKeys.Count > 0 || result.GlobalHotkeyFail != null || pinHotkeyFail || pinToggleFail)
+                {
+                    var msg = _languageService.GetString("Msg_ImportPartialSuccess_Base");
+                    if (failedKeys.Count > 0)
+                        msg += _languageService.Format("Msg_ImportPartialSuccess_LocalFail_Format", string.Join("\n", failedKeys));
+                    if (result.GlobalHotkeyFail != null)
+                        msg += _languageService.Format("Msg_ImportPartialSuccess_GlobalFail_Format", result.GlobalHotkeyFail);
+                    if (pinHotkeyFail)
+                        msg += _languageService.GetString("Msg_ImportPartialSuccess_PinFail");
+                    if (pinToggleFail)
+                        msg += _languageService.GetString("Msg_ImportPartialSuccess_PinToggleFail");
+                    System.Windows.MessageBox.Show(msg, _languageService.GetString("Msg_ImportPartialTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show(
+                        _languageService.GetString("Msg_ImportSuccess"),
+                        _languageService.GetString("Common_Info"),
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                RefreshListView();
+                UpdateUndoButtonState();
             }
             catch (Exception ex)
             {
@@ -1638,9 +1316,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(_settings,
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                await System.IO.File.WriteAllTextAsync(dialog.FileName, json);
+                await _controller.ExportToFileAsync(dialog.FileName);
             }
             catch (Exception ex)
             {
@@ -1655,7 +1331,7 @@ public partial class MainWindow : Window
     }
     private void EnterEditMode(ShortcutConfig cfg)
     {
-        _editingIndex = _settings.LocalShortcuts.IndexOf(cfg);
+        _editingIndex = _controller.Settings.LocalShortcuts.IndexOf(cfg);
         TxtLocalKey.Text = cfg.Key;
         CboType.SelectedIndex = cfg.Type switch
         {
@@ -1848,40 +1524,41 @@ public partial class MainWindow : Window
     }
     private void RefreshListView()
     {
+        var shortcuts = _controller.Settings.LocalShortcuts;
         // ✅ 1.0.5: 检测是否需要重新备份原始顺序
         // 触发条件：首次 / ObservableCollection 实例被替换（导入/撤销）/ 数量不一致（增删）
         bool needRebackup = _originalOrder == null
-            || _originalOrderSourceRef != _settings.LocalShortcuts
-            || _originalOrder!.Count != _settings.LocalShortcuts.Count;
+            || _originalOrderSourceRef != shortcuts
+            || _originalOrder!.Count != shortcuts.Count;
 
         if (needRebackup)
         {
-            _originalOrder = new List<ShortcutConfig>(_settings.LocalShortcuts);
-            _originalOrderSourceRef = _settings.LocalShortcuts;
+            _originalOrder = new List<ShortcutConfig>(shortcuts);
+            _originalOrderSourceRef = shortcuts;
         }
 
         LocalShortcuts.Clear();
 
         // ✅ 1.0.5: 按排序状态决定填充顺序
-        IEnumerable<ShortcutConfig> source = _settings.LocalShortcuts;
+        IEnumerable<ShortcutConfig> source = shortcuts;
         if (_sortByType == true)
         {
             // 优先级：程序 → 文件夹 → 网页；同类型内保持原始顺序
-            source = _settings.LocalShortcuts
+            source = shortcuts
                 .OrderBy(s => GetTypePriority(s.Type))
                 .ThenBy(s => SafeIndexOf(_originalOrder!, s));
         }
         else
         {
             // 恢复原始顺序（按 _originalOrder 排序）
-            source = _settings.LocalShortcuts
+            source = shortcuts
                 .OrderBy(s => SafeIndexOf(_originalOrder!, s));
         }
 
         foreach (var s in source)
             LocalShortcuts.Add(s);
 
-        LblCount.Text = _languageService.Format("Main_Count_Format", _settings.LocalShortcuts.Count);
+        LblCount.Text = _languageService.Format("Main_Count_Format", shortcuts.Count);
         LblEmptyHint.Visibility = LocalShortcuts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         _foregroundMonitor?.TriggerCurrent();
     }
@@ -1970,27 +1647,8 @@ public partial class MainWindow : Window
     /// <summary>执行撤销：恢复 LocalShortcuts + 重注册热键 + 持久化</summary>
     private async void DoUndo()
     {
-        var entry = _undoService.Undo();
-        if (entry == null) return;
-        // ✅ 1. 写回 _settings.LocalShortcuts（直接换 ObservableCollection 实例，
-        //    只触发一次 PropertyChanged + 一次 CollectionChanged，避免 Clear+Add×N 闪烁）
-        _settings.LocalShortcuts = new ObservableCollection<ShortcutConfig>(entry.Snapshot);
-        _hotkeyService.LogInternalHotkeyConflicts(
-            _settings.LocalShortcuts,
-            _settings.GlobalHotKey,
-            _settings.Pin?.SnapshotHotkey,
-            _settings.Pin?.ClipboardHotkey,
-            _settings.Pin?.ToggleHotkey,
-            "undo");
-        // ✅ 修复：不再让 LocalShortcuts 与 _settings.LocalShortcuts 指向同一实例
-        //    由 RefreshListView() 统一重建 UI 集合，彻底避免双写 / 引用合并问题
-        // ✅ 3. 重注册所有热键（ID 重新映射为 1..N）+ 收集失败项 toast
-        _hotkeyService.UnregisterAll();
-        var failedKeys = _isListening
-            ? _hotkeyService.RegisterAll(_settings.LocalShortcuts)
-            : new List<string>();
-        // ✅ 4. 持久化
-        await _settingsService.SaveAsync(_settings);
+        var result = await _controller.UndoAsync();
+        if (result == null) return;
         // ✅ 5. 退出编辑模式（撤销后 _editingIndex 指向的项可能已不存在或已变化）
         if (_editingIndex >= 0)
             BtnCancelEdit_Click(null!, null!);
@@ -1998,13 +1656,13 @@ public partial class MainWindow : Window
         //    （之前手动 LblCount/LblEmptyHint 更新会绕过排序，撤销后排序丢失）
         RefreshListView();
         // ✅ 7. 失败反馈 + 撤销提示
-        if (failedKeys.Count > 0)
+        if (result.FailedKeys.Count > 0)
             System.Windows.MessageBox.Show(
-                _languageService.Format("Undo_PartialFail_Format", entry.Description, string.Join("\n", failedKeys)),
+                _languageService.Format("Undo_PartialFail_Format", result.Description, string.Join("\n", result.FailedKeys)),
                 _languageService.GetString("Undo_Complete_Title"), MessageBoxButton.OK, MessageBoxImage.Warning);
         else
             System.Windows.MessageBox.Show(
-                _languageService.Format("Undo_Success_Format", entry.Description),
+                _languageService.Format("Undo_Success_Format", result.Description),
                 _languageService.GetString("Undo_Title"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
     }

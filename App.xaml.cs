@@ -58,6 +58,7 @@ public partial class App : System.Windows.Application
                         sp.GetRequiredService<ISettingsService>(),
                         sp.GetRequiredService<IFileTypeDetector>(),
                         sp.GetRequiredService<ILanguageService>()));
+                services.AddSingleton<IVectorController, VectorController>();
                 services.AddSingleton<MainWindow>();
             })
             .Build();
