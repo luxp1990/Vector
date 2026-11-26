@@ -75,6 +75,7 @@ public interface IVectorController
     void EvaluateForegroundPassthrough(string processName, bool isFullscreen);
     void SetDiagnosticLogging(bool enabled);
     void SetCoexistenceEnabled(bool enabled);
+    void SetMcpEnabled(bool enabled);
     void SetLanguage(string language);
     Task SetStartupDelayAsync(int seconds, CancellationToken ct = default);
 }

@@ -19,6 +19,9 @@ public class AppSettings
     /// <summary>记录热键注册、WM_HOTKEY 分发和目标启动阶段；默认关闭。</summary>
     public bool HotkeyDiagnosticsEnabled { get; set; } = false;
 
+    /// <summary>是否启用托盘进程内只读 MCP 命名管道服务端（Vector.Mcp）；默认关闭。</summary>
+    public bool McpEnabled { get; set; } = false;
+
     /// <summary>开机自启时额外等待秒数（0=不等）；仅带 --from-startup 启动时生效。</summary>
     public int StartupDelaySeconds { get; set; } = 0;
     public PinSettings Pin { get; set; } = new();

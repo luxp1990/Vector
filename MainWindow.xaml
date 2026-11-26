@@ -232,6 +232,14 @@
                                   Unchecked="ChkHotkeyCoexistence_Changed">
                             <TextBlock Text="{DynamicResource Settings_Coexistence_Label}" TextWrapping="Wrap"/>
                         </CheckBox>
+                        <CheckBox x:Name="ChkMcpEnabled"
+                                  Foreground="{DynamicResource TextMutedBrush}"
+                                  FontSize="11"
+                                  Margin="0,8,0,0"
+                                  Checked="ChkMcpEnabled_Changed"
+                                  Unchecked="ChkMcpEnabled_Changed">
+                            <TextBlock Text="MCP" TextWrapping="Wrap"/>
+                        </CheckBox>
 
                         <Border Height="1"
                                 Background="{DynamicResource BorderBrush}"
