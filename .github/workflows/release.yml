@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish self-contained single file
+        shell: pwsh
+        run: |
+          dotnet publish Vector.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $ver = '${{ github.ref_name }}'.TrimStart('v')
+          Compress-Archive -Path publish/Vector.exe -DestinationPath "Vector-v$ver-win-x64.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Vector-v*-win-x64.zip
+          body: |
+            免安装绿色版：下载 zip 解压后双击 Vector.exe 即可运行。
+            自包含 .NET 8 运行时，无需预装 .NET。仅支持 Windows x64。
+            配置与日志位于 %AppData%\Vector\。
