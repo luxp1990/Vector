@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private readonly ILanguageService _languageService;
     private readonly IUndoService _undoService;
     private readonly IPinFeatureService _pinFeatureService;
+    private readonly IMcpPipeServerService _mcpPipeServer;
     private int _editingIndex = -1;
     private bool _isPinActive = true;
     private bool _pinPausedByGlobal;
@@ -70,7 +71,8 @@ public partial class MainWindow : Window
         IThemeService themeService,
         ILanguageService languageService,
         IUndoService undoService,
-        IPinFeatureService pinFeatureService)
+        IPinFeatureService pinFeatureService,
+        IMcpPipeServerService mcpPipeServer)
     {
         _hotkeyService = hotkeyService;
         _settingsService = settingsService;
@@ -80,6 +82,7 @@ public partial class MainWindow : Window
         _languageService = languageService;
         _undoService = undoService;
         _pinFeatureService = pinFeatureService;
+        _mcpPipeServer = mcpPipeServer;
         InitializeComponent();
         DataContext = this;
         // 撤销栈状态变化时刷新按钮启用态
@@ -217,8 +220,10 @@ public partial class MainWindow : Window
             TglPin.IsChecked = settings.Pin.Enabled;
             ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
             ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
+            ChkMcpEnabled.IsChecked = settings.McpEnabled;
             CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             _suppressToggleSync = false;
+            _mcpPipeServer.SetEnabled(settings.McpEnabled);
             if (failedKeys.Count > 0)
                 System.Windows.MessageBox.Show(
                     _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
@@ -542,6 +547,15 @@ public partial class MainWindow : Window
             return;
         _controller.SetCoexistenceEnabled(ChkHotkeyCoexistence.IsChecked == true);
         _foregroundMonitor?.TriggerCurrent();
+    }
+
+    private void ChkMcpEnabled_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggleSync || Dispatcher == null || Dispatcher.HasShutdownStarted)
+            return;
+        bool enabled = ChkMcpEnabled.IsChecked == true;
+        _controller.SetMcpEnabled(enabled);
+        _mcpPipeServer.SetEnabled(enabled);
     }
 
     private void CboLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1263,7 +1277,9 @@ public partial class MainWindow : Window
                 TglPin.IsChecked = settings.Pin.Enabled;
                 ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
                 ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
+                ChkMcpEnabled.IsChecked = settings.McpEnabled;
                 _suppressToggleSync = false;
+                _mcpPipeServer.SetEnabled(settings.McpEnabled);
                 UpdateStatusUi();
                 _foregroundMonitor?.TriggerCurrent();
 
