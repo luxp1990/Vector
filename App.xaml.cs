@@ -59,6 +59,7 @@ public partial class App : System.Windows.Application
                         sp.GetRequiredService<IFileTypeDetector>(),
                         sp.GetRequiredService<ILanguageService>()));
                 services.AddSingleton<IVectorController, VectorController>();
+                services.AddSingleton<IMcpPipeServerService, McpPipeServerService>();
                 services.AddSingleton<MainWindow>();
             })
             .Build();
@@ -296,6 +297,14 @@ public partial class App : System.Windows.Application
 
         if (_host != null)
         {
+            try
+            {
+                var mcpServer = _host.Services.GetService<IMcpPipeServerService>();
+                if (mcpServer != null)
+                    await mcpServer.StopAsync();
+            }
+            catch { }
+
             await _host.StopAsync(TimeSpan.FromSeconds(5));
             _host.Dispose();
         }
