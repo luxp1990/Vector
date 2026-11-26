@@ -232,4 +232,12 @@
     <sys:String x:Key="Settings_Portable_Enabled">已启用便携模式（配置将保存在程序目录）。请重启 Vector 后生效。</sys:String>
     <sys:String x:Key="Settings_Portable_Disabled">已关闭便携模式（配置改用用户目录）。请重启 Vector 后生效。</sys:String>
     <sys:String x:Key="Settings_Portable_SwitchFailed_Format">切换失败：{0}</sys:String>
+
+    <!-- MCP Settings -->
+    <sys:String x:Key="Settings_McpAllowWrites_Label">允许 MCP 写操作（增删改/开关/导入）</sys:String>
+    <sys:String x:Key="Settings_McpAllowWrites_Tooltip">开启后才注册 add_shortcut、update_shortcut、delete_shortcut、set_listening、import_config；每次调用仍需校验令牌（默认关闭）</sys:String>
+    <sys:String x:Key="Settings_McpAllowExecute_Label">允许 MCP 执行快捷键（高危）</sys:String>
+    <sys:String x:Key="Settings_McpAllowExecute_Tooltip">开启后才注册 execute_shortcut，允许外部通过 MCP 启动本地快捷键目标；每次调用仍需校验令牌（默认关闭）</sys:String>
+    <sys:String x:Key="Settings_McpToken_Tooltip">MCP 写/执行工具校验令牌（为空时拒绝一切写/执行调用；点击右侧按钮生成并复制到剪贴板）</sys:String>
+    <sys:String x:Key="Settings_McpToken_Regenerate">生成/重置令牌</sys:String>
 </ResourceDictionary>
