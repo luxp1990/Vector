@@ -8,6 +8,7 @@ public class AppSettings
     public ObservableCollection<ShortcutConfig> LocalShortcuts { get; set; } = new();
     public string GlobalHotKey { get; set; } = "None";
     public string Theme { get; set; } = "Dark";
+    public string Language { get; set; } = "zh-CN";
 
     // ✅ 1.0.1: UIPI 缓解 —— 持久化"以管理员身份启动"偏好
     public bool RunAsAdmin { get; set; } = false;

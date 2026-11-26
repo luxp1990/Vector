@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private readonly IExecutorService _executorService;
     private readonly IFileTypeDetector _fileTypeDetector;
     private readonly IThemeService _themeService;
+    private readonly ILanguageService _languageService;
     private readonly IUndoService _undoService;
     private readonly IPinFeatureService _pinFeatureService;
     private AppSettings _settings = new();
@@ -67,6 +68,7 @@ public partial class MainWindow : Window
         IExecutorService executorService,
         IFileTypeDetector fileTypeDetector,
         IThemeService themeService,
+        ILanguageService languageService,
         IUndoService undoService,
         IPinFeatureService pinFeatureService)
     {
@@ -75,6 +77,7 @@ public partial class MainWindow : Window
         _executorService = executorService;
         _fileTypeDetector = fileTypeDetector;
         _themeService = themeService;
+        _languageService = languageService;
         _undoService = undoService;
         _pinFeatureService = pinFeatureService;
         InitializeComponent();
@@ -198,6 +201,7 @@ public partial class MainWindow : Window
             TglPin.IsChecked = _settings.Pin.Enabled;
             ChkHotkeyDiagnostics.IsChecked = _settings.HotkeyDiagnosticsEnabled;
             ChkHotkeyCoexistence.IsChecked = _settings.Coexistence.Enabled;
+            CboLanguage.SelectedIndex = string.Equals(_settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             _suppressToggleSync = false;
             var failedKeys = _isListening
                 ? _hotkeyService.RegisterAll(_settings.LocalShortcuts)
@@ -206,8 +210,9 @@ public partial class MainWindow : Window
                 System.Windows.MessageBox.Show(
                     $"以下快捷键注册失败（可能被占用）：\n{string.Join("\n", failedKeys)}",
                     "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
-            // 应用持久化的主题（必须在 RefreshListView 之前）
+            // 应用持久化的主题与语言（必须在 RefreshListView 之前）
             _themeService.Apply(_settings.Theme != "Light");
+            _languageService.Apply(_settings.Language);
             RefreshListView();
         }
         catch (Exception ex)
@@ -215,6 +220,7 @@ public partial class MainWindow : Window
             System.Windows.MessageBox.Show($"初始化失败: {ex.Message}", "错误",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             _settings = new AppSettings();
+            _languageService.Apply(_settings.Language);
             RefreshListView();
         }
         InitializePinFeatures();
@@ -551,6 +557,20 @@ public partial class MainWindow : Window
         _ = _settingsService.LogAsync($"Hotkey coexistence {(enabled ? "enabled" : "disabled")}");
         _ = _settingsService.SaveAsync(_settings);
         _foregroundMonitor?.TriggerCurrent();
+    }
+
+    private void CboLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressToggleSync || Dispatcher == null || Dispatcher.HasShutdownStarted)
+            return;
+        if (CboLanguage.SelectedItem is not ComboBoxItem item || item.Tag is not string lang)
+            return;
+        if (string.Equals(lang, _settings.Language, StringComparison.Ordinal))
+            return;
+
+        _settings.Language = lang;
+        _languageService.Apply(lang);
+        _ = _settingsService.SaveAsync(_settings);
     }
 
     private void OnForegroundProcessChanged(string processName, bool isFullscreen)
