@@ -22,6 +22,15 @@ public class AppSettings
     /// <summary>是否启用托盘进程内只读 MCP 命名管道服务端（Vector.Mcp）；默认关闭。</summary>
     public bool McpEnabled { get; set; } = false;
 
+    /// <summary>是否允许 MCP 写操作工具（add/update/delete/set_listening/import_config）；默认关闭。</summary>
+    public bool McpAllowWrites { get; set; } = false;
+
+    /// <summary>是否允许 MCP 高危执行工具（execute_shortcut）；默认关闭。</summary>
+    public bool McpAllowExecute { get; set; } = false;
+
+    /// <summary>MCP 写/执行工具调用校验令牌；默认为空（空时拒绝一切写/执行调用）。</summary>
+    public string McpToken { get; set; } = string.Empty;
+
     /// <summary>开机自启时额外等待秒数（0=不等）；仅带 --from-startup 启动时生效。</summary>
     public int StartupDelaySeconds { get; set; } = 0;
     public PinSettings Pin { get; set; } = new();
