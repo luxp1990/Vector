@@ -221,6 +221,9 @@ public partial class MainWindow : Window
             ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
             ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
             ChkMcpEnabled.IsChecked = settings.McpEnabled;
+            ChkMcpAllowWrites.IsChecked = settings.McpAllowWrites;
+            ChkMcpAllowExecute.IsChecked = settings.McpAllowExecute;
+            TxtMcpToken.Text = settings.McpToken;
             CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             _suppressToggleSync = false;
             _mcpPipeServer.SetEnabled(settings.McpEnabled);
@@ -556,6 +559,33 @@ public partial class MainWindow : Window
         bool enabled = ChkMcpEnabled.IsChecked == true;
         _controller.SetMcpEnabled(enabled);
         _mcpPipeServer.SetEnabled(enabled);
+    }
+
+    private void ChkMcpAllowWrites_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggleSync || Dispatcher == null || Dispatcher.HasShutdownStarted)
+            return;
+        _controller.SetMcpAllowWrites(ChkMcpAllowWrites.IsChecked == true);
+    }
+
+    private void ChkMcpAllowExecute_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggleSync || Dispatcher == null || Dispatcher.HasShutdownStarted)
+            return;
+        _controller.SetMcpAllowExecute(ChkMcpAllowExecute.IsChecked == true);
+    }
+
+    private void BtnRegenerateMcpToken_Click(object sender, RoutedEventArgs e)
+    {
+        var token = _controller.RegenerateMcpToken();
+        TxtMcpToken.Text = token;
+        try
+        {
+            System.Windows.Clipboard.SetText(token);
+        }
+        catch
+        {
+        }
     }
 
     private void CboLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1278,6 +1308,9 @@ public partial class MainWindow : Window
                 ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
                 ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
                 ChkMcpEnabled.IsChecked = settings.McpEnabled;
+                ChkMcpAllowWrites.IsChecked = settings.McpAllowWrites;
+                ChkMcpAllowExecute.IsChecked = settings.McpAllowExecute;
+                TxtMcpToken.Text = settings.McpToken;
                 _suppressToggleSync = false;
                 _mcpPipeServer.SetEnabled(settings.McpEnabled);
                 UpdateStatusUi();
