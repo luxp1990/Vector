@@ -29,6 +29,7 @@
 
     <!-- 功能开关（滑动开关）样式：轨道 40x20，白色滑块，开启态用主色 -->
     <Window.Resources>
+        <local:ShortcutTypeToDisplayConverter x:Key="ShortcutTypeToDisplayConverter"/>
         <Style x:Key="ToggleSwitch" TargetType="ToggleButton">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="20"/>
@@ -369,10 +370,10 @@
                                   Style="{StaticResource ModernComboBox}"
                                   SelectedIndex="0"
                                   SelectionChanged="CboType_SelectionChanged">
-                            <ComboBoxItem Content="程序"/>
-                            <ComboBoxItem Content="文件夹"/>
-                            <ComboBoxItem Content="网页"/>
-                            <ComboBoxItem Content="文件"/>
+                            <ComboBoxItem Content="{DynamicResource Type_Program}" Tag="程序"/>
+                            <ComboBoxItem Content="{DynamicResource Type_Folder}" Tag="文件夹"/>
+                            <ComboBoxItem Content="{DynamicResource Type_Web}" Tag="网页"/>
+                            <ComboBoxItem Content="{DynamicResource Type_File}" Tag="文件"/>
                         </ComboBox>
 
                         <TextBox x:Name="TxtTarget"
@@ -654,7 +655,7 @@
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
                                                Padding="16,0,0,0"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Type}"
+                                    <TextBlock Grid.Column="1" Text="{Binding Type, Converter={StaticResource ShortcutTypeToDisplayConverter}}"
                                                FontSize="13"
                                                Foreground="{DynamicResource TextMutedBrush}"
                                                VerticalAlignment="Center"

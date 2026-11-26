@@ -2,4 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="Settings_Language_Label">语言</sys:String>
+    <sys:String x:Key="Type_Program">程序</sys:String>
+    <sys:String x:Key="Type_Folder">文件夹</sys:String>
+    <sys:String x:Key="Type_Web">网页</sys:String>
+    <sys:String x:Key="Type_File">文件</sys:String>
 </ResourceDictionary>

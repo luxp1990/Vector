@@ -84,6 +84,7 @@ public partial class MainWindow : Window
         DataContext = this;
         // 撤销栈状态变化时刷新按钮启用态
         _undoService.StateChanged += (_, _) => UpdateUndoButtonState();
+        _languageService.LanguageChanged += (_, _) => RefreshListView();
         UpdateUndoButtonState();
         var cm = new System.Windows.Controls.ContextMenu
         {
@@ -1186,7 +1187,7 @@ public partial class MainWindow : Window
         var cfg = new ShortcutConfig
         {
             Key = enteringKey,
-            Type = (CboType.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "\u7A0B\u5E8F",
+            Type = GetSelectedType(),
             Target = TxtTarget.Text,
             Arguments = TxtArguments.Text?.Trim() ?? "",
             WorkingDirectory = TxtWorkingDir.Text?.Trim() ?? "",
@@ -1337,10 +1338,13 @@ public partial class MainWindow : Window
         UpdateExtraFieldsEnabled();
     }
 
+    private string GetSelectedType()
+        => (CboType.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? ShortcutTypes.Program;
+
     private void UpdateExtraFieldsEnabled()
     {
         if (CboRunStrategy == null || TxtArguments == null) return;
-        var isProg = (CboType.SelectedItem as ComboBoxItem)?.Content?.ToString() == "程序";
+        var isProg = GetSelectedType() == ShortcutTypes.Program;
         CboRunStrategy.IsEnabled = isProg;
         // 参数/工作目录对程序最有用，文件/脚本也可填参数
         TxtArguments.IsEnabled = true;
@@ -1398,22 +1402,21 @@ public partial class MainWindow : Window
     }
     private void BtnBrowse_Click(object sender, RoutedEventArgs e)
     {
-        var typeItem = CboType.SelectedItem as ComboBoxItem;
-        var type = typeItem?.Content?.ToString();
-        if (type == "\u6587\u4EF6\u5939")
+        var type = GetSelectedType();
+        if (type == ShortcutTypes.Folder)
         {
             var dialog = new Forms.FolderBrowserDialog();
             if (dialog.ShowDialog() == Forms.DialogResult.OK)
                 TxtTarget.Text = dialog.SelectedPath;
         }
-        else if (type == "\u7F51\u9875")  // Bug 9: 网页类型不弹文件选择器
+        else if (type == ShortcutTypes.Web)  // Bug 9: 网页类型不弹文件选择器
         {
             TxtTarget.Focus();
             TxtTarget.SelectAll();
             System.Windows.MessageBox.Show("\u8BF7\u76F4\u63A5\u8F93\u5165\u7F51\u5740\uFF0C\u4F8B\u5982 https://www.google.com",
                 "\u63D0\u793A", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        else if (type == "\u6587\u4EF6")  // 文件类型：选择文档
+        else if (type == ShortcutTypes.File)  // 文件类型：选择文档
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
@@ -1580,9 +1583,9 @@ public partial class MainWindow : Window
         TxtLocalKey.Text = cfg.Key;
         CboType.SelectedIndex = cfg.Type switch
         {
-            "\u6587\u4EF6\u5939" => 1,
-            "\u7F51\u9875" => 2,
-            "\u6587\u4EF6" => 3,
+            ShortcutTypes.Folder => 1,
+            ShortcutTypes.Web => 2,
+            ShortcutTypes.File => 3,
             _ => 0
         };
         TxtTarget.Text = cfg.Target;
@@ -1710,9 +1713,9 @@ public partial class MainWindow : Window
         var type = _fileTypeDetector.Detect(target);
         CboType.SelectedIndex = type switch
         {
-            "\u6587\u4EF6\u5939" => 1,
-            "\u7F51\u9875" => 2,
-            "\u6587\u4EF6" => 3,
+            ShortcutTypes.Folder => 1,
+            ShortcutTypes.Web => 2,
+            ShortcutTypes.File => 3,
             _ => 0
         };
     }
@@ -1824,11 +1827,11 @@ public partial class MainWindow : Window
     {
         return type switch
         {
-            "\u7A0B\u5E8F" => 0,  // 程序
-            "\u6587\u4EF6\u5939" => 1,  // 文件夹
-            "\u7F51\u9875" => 2,  // 网页
-            "\u6587\u4EF6" => 3,  // 文件
-            _ => 4,  // 未知类型
+            ShortcutTypes.Program => 0,
+            ShortcutTypes.Folder => 1,
+            ShortcutTypes.Web => 2,
+            ShortcutTypes.File => 3,
+            _ => 4,
         };
     }
 
@@ -1941,4 +1944,22 @@ public partial class MainWindow : Window
             }
         });
     }
+}
+
+public sealed class ShortcutTypeToDisplayConverter : System.Windows.Data.IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+    {
+        if (value is not string type || string.IsNullOrEmpty(type))
+            return string.Empty;
+
+        var key = ShortcutTypes.ToResourceKey(type);
+        if (key != null && System.Windows.Application.Current?.TryFindResource(key) is string localized)
+            return localized;
+
+        return type;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => throw new NotSupportedException();
 }

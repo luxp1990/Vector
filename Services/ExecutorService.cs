@@ -85,7 +85,7 @@ public class ExecutorService : IExecutorService
 
             string fileName;
             string arguments;
-            if (cfg.Type == "程序")
+            if (cfg.Type == ShortcutTypes.Program)
             {
                 (fileName, var parsedArgs) = ParseCommandLine(actualTarget);
                 // 独立参数字段优先；否则沿用从 Target 解析出的参数（兼容旧配置）
@@ -98,12 +98,12 @@ public class ExecutorService : IExecutorService
             }
 
             var targetLower = fileName.ToLowerInvariant();
-            bool isScript = (cfg.Type == "程序" || cfg.Type == "文件") &&
+            bool isScript = (cfg.Type == ShortcutTypes.Program || cfg.Type == ShortcutTypes.File) &&
                             (targetLower.EndsWith(".bat") || targetLower.EndsWith(".cmd") ||
                              targetLower.EndsWith(".ps1") || targetLower.EndsWith(".vbs"));
 
             // 运行策略（仅非脚本「程序」）
-            if (cfg.Type == "程序" && !isScript
+            if (cfg.Type == ShortcutTypes.Program && !isScript
                 && TryApplyRunStrategy(RunStrategies.Normalize(cfg.RunStrategy), fileName))
             {
                 LogDiagnostic($"Shortcut execution handled by run strategy: key={cfg.Key}; strategy={RunStrategies.Normalize(cfg.RunStrategy)}");
@@ -151,14 +151,14 @@ public class ExecutorService : IExecutorService
             {
                 startInfo.WorkingDirectory = fieldWorkDir;
             }
-            else if ((cfg.Type == "程序" || cfg.Type == "文件") && Path.IsPathRooted(fileName))
+            else if ((cfg.Type == ShortcutTypes.Program || cfg.Type == ShortcutTypes.File) && Path.IsPathRooted(fileName))
             {
                 string? dir = Path.GetDirectoryName(fileName);
                 if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                     startInfo.WorkingDirectory = dir;
             }
 
-            if (cfg.Type == "文件夹" && Directory.Exists(fileName))
+            if (cfg.Type == ShortcutTypes.Folder && Directory.Exists(fileName))
             {
                 startInfo.FileName = "explorer.exe";
                 startInfo.Arguments = $"\"{fileName}\"";

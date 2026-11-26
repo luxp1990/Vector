@@ -2,4 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="Settings_Language_Label">Language</sys:String>
+    <sys:String x:Key="Type_Program">Program</sys:String>
+    <sys:String x:Key="Type_Folder">Folder</sys:String>
+    <sys:String x:Key="Type_Web">Webpage</sys:String>
+    <sys:String x:Key="Type_File">File</sys:String>
 </ResourceDictionary>
