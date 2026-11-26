@@ -232,4 +232,12 @@
     <sys:String x:Key="Settings_Portable_Enabled">Portable mode enabled (config will be saved in app folder). Restart Vector to apply.</sys:String>
     <sys:String x:Key="Settings_Portable_Disabled">Portable mode disabled (config will be saved in user folder). Restart Vector to apply.</sys:String>
     <sys:String x:Key="Settings_Portable_SwitchFailed_Format">Switch failed: {0}</sys:String>
+
+    <!-- MCP Settings -->
+    <sys:String x:Key="Settings_McpAllowWrites_Label">Allow MCP write operations (shortcuts/listening/import)</sys:String>
+    <sys:String x:Key="Settings_McpAllowWrites_Tooltip">Registers write tools (add/update/delete_shortcut, set_listening, import_config); calls still require McpToken (off by default)</sys:String>
+    <sys:String x:Key="Settings_McpAllowExecute_Label">Allow MCP shortcut execution (high risk)</sys:String>
+    <sys:String x:Key="Settings_McpAllowExecute_Tooltip">Registers execute_shortcut to launch configured targets via MCP; calls still require McpToken (off by default)</sys:String>
+    <sys:String x:Key="Settings_McpToken_Tooltip">MCP write/execute token (empty rejects all write/execute calls; click button to generate and copy)</sys:String>
+    <sys:String x:Key="Settings_McpToken_Regenerate">Generate / Reset Token</sys:String>
 </ResourceDictionary>

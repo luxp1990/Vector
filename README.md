@@ -155,6 +155,64 @@ python tests\run_all.py --no-build --exe release\Vector-2.0.1\Vector.exe
 
 ---
 
+## MCP 集成（Model Context Protocol）
+
+Vector 托盘主进程内置了可选的 MCP 命名管道服务端（管道名 `Vector.Mcp`），并通过 `Vector.exe --mcp-bridge` 提供零额外依赖的 stdio 原始字节桥接模式，供 Claude Desktop、Claude Code 等 MCP 客户端接入。
+
+### 1. 客户端配置示例（stdio 桥）
+
+先启动 Vector 主程序并在设置卡片中勾选 **MCP**；当主程序未运行或未开启 MCP 时，`--mcp-bridge` 会输出 JSON-RPC 错误并直接退出（不会自动拉起主程序）。
+
+**Claude Desktop（`claude_desktop_config.json`）：**
+
+```json
+{
+  "mcpServers": {
+    "vector": {
+      "command": "C:\\Path\\To\\Vector.exe",
+      "args": ["--mcp-bridge"]
+    }
+  }
+}
+```
+
+**Claude Code（`.mcp.json` 或用户级 MCP 配置）：**
+
+```json
+{
+  "mcpServers": {
+    "vector": {
+      "type": "stdio",
+      "command": "C:\\Path\\To\\Vector.exe",
+      "args": ["--mcp-bridge"]
+    }
+  }
+}
+```
+
+### 2. 工具清单与开关门控
+
+| 工具名称 | 类别 | 所需开关 | 需传 `token` | 说明 |
+| --- | --- | --- | --- | --- |
+| `list_shortcuts` | 只读 | `McpEnabled` | 否 | 列出所有本地快捷键配置 |
+| `get_status` | 只读 | `McpEnabled` | 否 | 获取监听状态与设置摘要 |
+| `export_config` | 只读 | `McpEnabled` | 否 | 导出当前配置 JSON |
+| `add_shortcut` | 写操作 | `McpEnabled` + `McpAllowWrites` | 是 | 新增本地快捷键 |
+| `update_shortcut` | 写操作 | `McpEnabled` + `McpAllowWrites` | 是 | 按索引更新本地快捷键 |
+| `delete_shortcut` | 写操作 | `McpEnabled` + `McpAllowWrites` | 是 | 按索引删除本地快捷键 |
+| `set_listening` | 写操作 | `McpEnabled` + `McpAllowWrites` | 是 | 开启或暂停全局热键监听 |
+| `import_config` | 写操作 | `McpEnabled` + `McpAllowWrites` | 是 | 导入并应用配置 JSON |
+| `execute_shortcut` | 高危执行 | `McpEnabled` + `McpAllowExecute` | 是 | 按索引或热键直接执行目标 |
+
+### 3. 安全说明
+
+- **默认全关**：`McpEnabled`、`McpAllowWrites`、`McpAllowExecute` 默认均为 `false`，`McpToken` 默认为空字符串；默认状态下不监听管道，也不暴露任何写/执行工具。
+- **仅当前用户 SID 可连**：命名管道 `Vector.Mcp` 通过 `PipeSecurity` 显式限制仅当前 Windows 用户 SID 可访问。
+- **令牌双保险（`McpToken`）**：所有写工具与 `execute_shortcut` 每次调用都必须传入与设置中一致的 `token`；`McpToken` 为空时拒绝一切写/执行调用。可在设置卡片中点击「生成/重置令牌」生成高熵随机令牌并自动复制到剪贴板。
+- **主线程调度与审计日志**：所有工具调用均经 WPF `Dispatcher.InvokeAsync` 回到主线程操作状态，调用记录与异常统一写入 `Vector.log`（不记录令牌明文）。
+
+---
+
 ## 五、开源协议
 
 本项目采用 [MIT License](LICENSE) 开源协议。

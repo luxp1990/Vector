@@ -240,6 +240,46 @@
                                   Unchecked="ChkMcpEnabled_Changed">
                             <TextBlock Text="MCP" TextWrapping="Wrap"/>
                         </CheckBox>
+                        <CheckBox x:Name="ChkMcpAllowWrites"
+                                  ToolTip="{DynamicResource Settings_McpAllowWrites_Tooltip}"
+                                  Foreground="{DynamicResource TextMutedBrush}"
+                                  FontSize="11"
+                                  Margin="16,6,0,0"
+                                  Checked="ChkMcpAllowWrites_Changed"
+                                  Unchecked="ChkMcpAllowWrites_Changed">
+                            <TextBlock Text="{DynamicResource Settings_McpAllowWrites_Label}" TextWrapping="Wrap"/>
+                        </CheckBox>
+                        <CheckBox x:Name="ChkMcpAllowExecute"
+                                  ToolTip="{DynamicResource Settings_McpAllowExecute_Tooltip}"
+                                  Foreground="{DynamicResource TextMutedBrush}"
+                                  FontSize="11"
+                                  Margin="16,6,0,0"
+                                  Checked="ChkMcpAllowExecute_Changed"
+                                  Unchecked="ChkMcpAllowExecute_Changed">
+                            <TextBlock Text="{DynamicResource Settings_McpAllowExecute_Label}" TextWrapping="Wrap"/>
+                        </CheckBox>
+                        <Grid Margin="16,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtMcpToken"
+                                     Style="{StaticResource ModernTextBox}"
+                                     IsReadOnly="True"
+                                     FontSize="11"
+                                     Height="28"
+                                     Padding="8,4"
+                                     ToolTip="{DynamicResource Settings_McpToken_Tooltip}"/>
+                            <Button x:Name="BtnRegenerateMcpToken"
+                                    Grid.Column="1"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Content="{DynamicResource Settings_McpToken_Regenerate}"
+                                    FontSize="11"
+                                    Height="28"
+                                    Padding="10,0"
+                                    Margin="6,0,0,0"
+                                    Click="BtnRegenerateMcpToken_Click"/>
+                        </Grid>
 
                         <Border Height="1"
                                 Background="{DynamicResource BorderBrush}"
