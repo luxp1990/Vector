@@ -1,9 +1,15 @@
 # Vector — 全局快捷键与鼠标手势贴图工具 / Global Hotkey & Gesture Pin Tool (v2.1.0)
 
+[中文说明](#中文说明) | [English](#english)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 8.0](https://img.shields.io/badge/.NET-8.0--windows-purple.svg)](https://dotnet.microsoft.com/)
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows-0078D6.svg)](https://www.microsoft.com/windows)
 [![Release: v2.1.0](https://img.shields.io/badge/Release-v2.1.0-green.svg)](https://github.com/luxp1990/Vector/releases)
+
+---
+
+<a id="中文说明"></a>
 
 > 如果你受够了每次打开常用工具都要在一堆图标和窗口里来回翻找，或者只是想把一段报错、一张参考图临时钉在屏幕最前面却要按好几步截图再贴图，不妨试试 **Vector**。
 
@@ -142,3 +148,124 @@ python tests\run_all.py
   - 多显示器跨屏手势轨迹完整显示、原位精准贴图、高分屏像素级对齐与 DWM 截屏帧同步消残影。
 - **v2.0.1** (2026-09-29)
   - 修复手势遮罩窗空闲态未离屏导致系统被误判为 `QUNS_BUSY` 的问题。
+
+---
+
+<a id="english"></a>
+
+> Tired of digging through desktop icons and cluttered windows just to launch your daily tools, or going through multiple shortcuts just to pin an error snippet or reference chart on top of your screen? Give **Vector** a try.
+
+---
+
+### 💡 Why I Built Vector
+
+Two small everyday friction points pushed me to build this:
+
+- **Switching windows breaks flow**: Terminals, scripts, project folders, and web tools are scattered everywhere. Most launchers feel either too bloated or clunky when it comes to managing and pausing global hotkeys.
+- **Pinning a quick reference takes too many steps**: Whenever you want to keep a piece of code, a parameter table, or an error log pinned on top while working, traditional screenshot tools force you to hit a hotkey, drag a selection, and click "Pin" — moving your hand back and forth between keyboard and mouse.
+
+So I built **Vector** — a lightweight Windows tray utility focused on doing just two things cleanly:
+
+- **A minimal global hotkey manager**: Bind programs, folders, URLs, and scripts to clean key combos, with a single global toggle hotkey, smart foreground-app yielding, and optional UAC elevation.
+- **One-stroke mouse gesture pinning**: **Hold the right mouse button and draw a box counterclockwise** — release it, and the enclosed region immediately becomes a topmost floating pin in place.
+
+Built natively on **.NET 8 (WPF) + WinForms NotifyIcon** as a single self-contained process with **Simplified Chinese / English** UI, **Dark / Light** themes, a **responsive narrow-window layout**, and an integrated **Model Context Protocol (MCP)** named-pipe server.
+
+---
+
+### 🎯 Core Feature: Mouse Gesture Pinning
+
+Gesture pinning is Vector's signature workflow — **all you need is your right mouse button**:
+
+1. **Hold the right mouse button**;
+2. **Draw a box counterclockwise** on the screen (any closed approximate rectangle works, even across multiple monitors);
+3. **Release the right mouse button**, and everything inside the box is captured and pinned right in place on top!
+
+![Vector Mouse Gesture Pin Demo](Resources/gesture_pin_demo.gif)
+
+#### Pin Interactions & Alternatives
+- **Pin window controls**: **Left-drag** to move, **mouse wheel** to adjust opacity (25%–100%), and **right-click / double-click / `Esc` / `Delete`** to close.
+- **Region & clipboard hotkeys**: In addition to mouse gestures, you can use `Ctrl+Alt+A` for region capture or `Ctrl+Alt+S` to pin an image from your clipboard (both customizable in settings, with an optional "Auto-copy capture to clipboard" toggle).
+- **Multi-monitor & HiDPI pixel alignment**: Full virtual-desktop support and crisp alignment under 125%–250% DPI scaling without DWM capture artifacts.
+
+---
+
+### 📦 Download & Usage
+
+Download the single-file portable package from [Releases](https://github.com/luxp1990/Vector/releases) (each archive contains a single `Vector.exe`; config and logs are stored in `%AppData%\Vector\`):
+
+| Package | Publish Mode | Runtime Requirement | Notes |
+| :--- | :--- | :--- | :--- |
+| `Vector-v2.1.0-win-x64.zip` | **Default Full** (`self-contained`) | None | Bundles .NET 8 runtime; ready to run out of the box |
+| `Vector-v2.1.0-win-x64-light.zip` | **Light** (`framework-dependent`) | **.NET 8 Desktop Runtime (x64)** | Significantly smaller download size |
+
+---
+
+### ✨ Key Features
+
+- **⌨️ Global Hotkey Management**:
+  - Supports any combination of `Ctrl / Alt / Shift / Win` with live key capture and automatic filtering of reserved system keys (`Ctrl+C`, `Alt+F4`, `F5`, etc.).
+  - Supports **Programs (`.exe` with arguments & working dir)**, **Folders**, **Web URLs (`http/https`)**, and **Files/Scripts (`.bat/.cmd/.ps1/.vbs`)**, with drag-and-drop auto-detection and `.lnk` / `.url` resolution.
+  - Includes an independent **Global Toggle Hotkey** (e.g. `Ctrl+Alt+V`), per-feature toggles, single-step Undo (`Ctrl+Z`), type sorting, and JSON import/export.
+- **🛡️ Foreground App Yielding & UIPI Elevation**:
+  - Automatically yields ordinary hotkeys when fullscreen apps or configured foreground apps (WeChat, Chrome, Excel, VS Code, etc.) are active, while never yielding the global toggle hotkey.
+  - Optional "Run as Administrator" UAC self-elevation so hotkeys work over elevated windows.
+- **🎨 Modern Desktop UX**:
+  - System tray residence with live status indicator (Listening / Paused), instant **Dark / Light** theme and **Chinese / English** switching, and a responsive compact layout with a dedicated Settings overlay.
+- **🔌 Native MCP Server**:
+  - Built-in named-pipe MCP server (`Vector.Mcp`, restricted to the current user SID) and `Vector.exe --mcp-bridge` stdio bridge. Disabled by default; write/execute tools require explicit opt-in and `McpToken` verification.
+
+---
+
+### 🛠️ Build, Test & Architecture
+
+```powershell
+# Build Release
+dotnet build Vector.csproj -c Release
+
+# Run (elevated recommended for full UIPI hotkey coverage)
+dotnet run -c Release
+
+# Publish self-contained single file -> publish/Vector.exe
+dotnet publish Vector.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+# Publish framework-dependent light single file -> publish-light/Vector.exe
+dotnet publish Vector.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-light
+
+# Run full regression suite (build + GestureOverlayWindow contract tests + integration)
+python tests\run_all.py
+```
+
+---
+
+### 🤖 MCP Client Configuration
+
+Start Vector and enable **MCP** in the Settings panel. If Vector is not running or MCP is disabled, `--mcp-bridge` outputs a JSON-RPC error and exits cleanly.
+
+```json
+{
+  "mcpServers": {
+    "vector": {
+      "type": "stdio",
+      "command": "C:\\Path\\To\\Vector.exe",
+      "args": ["--mcp-bridge"]
+    }
+  }
+}
+```
+
+| Tool | Category | Required Flags | `token` Required | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `list_shortcuts` / `get_status` / `export_config` | Read-only | `McpEnabled` | No | Query shortcuts, status, and export config |
+| `add_shortcut` / `update_shortcut` / `delete_shortcut` / `set_listening` / `import_config` | Write | `McpEnabled` + `McpAllowWrites` | Yes | Manage shortcuts, toggle listening, import config |
+| `execute_shortcut` | Execute | `McpEnabled` + `McpAllowExecute` | Yes | Execute a target by index or hotkey |
+
+---
+
+### 📄 License & Changelog
+
+Licensed under the [MIT License](LICENSE).
+
+- **v2.1.0** (2026-11-27): Responsive narrow layout, Settings overlay, custom scrollbars, target name/path display, complete ZH/EN i18n, native MCP server & `--mcp-bridge`, and light release build.
+- **v2.0.2** (2026-11-05): Multi-monitor gesture trace, in-place pixel-accurate pinning, HiDPI alignment, and `DwmFlush` capture sync.
+- **v2.0.1** (2026-09-29): Fixed idle gesture overlay triggering `QUNS_BUSY` fullscreen detection.
