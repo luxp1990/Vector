@@ -50,6 +50,11 @@ public partial class MainWindow : Window
     private System.Windows.Controls.TextBlock? _headerTypeTextBlock;
     public ObservableCollection<ShortcutConfig> LocalShortcuts { get; private set; } = new();
 
+    private bool _isNarrowLayout = false;
+    private bool _layoutInitialized = false;
+    private const double NarrowBreakpoint = 780.0;
+    private IInputElement? _settingsReturnFocus;
+
     /// <summary>
     /// ✅ 1.0.5: 类型排序开关。null = 按原始顺序；true = 按类型排序（程序→文件夹→网页）。
     /// 仅控制 UI 显示顺序，不写盘（重启即回到配置顺序）。
@@ -85,6 +90,7 @@ public partial class MainWindow : Window
         _mcpPipeServer = mcpPipeServer;
         InitializeComponent();
         DataContext = this;
+        ApplyResponsiveLayout(Width < NarrowBreakpoint);
         // 撤销栈状态变化时刷新按钮启用态
         _undoService.StateChanged += (_, _) => UpdateUndoButtonState();
         _languageService.LanguageChanged += OnLanguageChanged;
@@ -227,14 +233,14 @@ public partial class MainWindow : Window
             CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             _suppressToggleSync = false;
             _mcpPipeServer.SetEnabled(settings.McpEnabled);
+            // 应用持久化的主题与语言（必须在 RefreshListView 与阻塞弹窗之前）
+            _themeService.Apply(settings.Theme != "Light");
+            _languageService.Apply(settings.Language);
+            RefreshListView();
             if (failedKeys.Count > 0)
                 System.Windows.MessageBox.Show(
                     _languageService.Format("Msg_HotkeysRegisterFailed_Format", string.Join("\n", failedKeys)),
                     _languageService.GetString("Common_Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
-            // 应用持久化的主题与语言（必须在 RefreshListView 之前）
-            _themeService.Apply(settings.Theme != "Light");
-            _languageService.Apply(settings.Language);
-            RefreshListView();
         }
         catch (Exception ex)
         {
@@ -972,7 +978,7 @@ public partial class MainWindow : Window
             oldSettings.ToggleHotkey?.Trim() ?? "",
             newSettings.ToggleHotkey?.Trim() ?? "",
             StringComparison.OrdinalIgnoreCase);
-        if (toggleHotkeyChanged && !_hotkeyService.RegisterPinToggleHotkey(newSettings.ToggleHotkey))
+        if (toggleHotkeyChanged && !_hotkeyService.RegisterPinToggleHotkey(newSettings.ToggleHotkey ?? ""))
         {
             int errorCode = _hotkeyService.LastRegisterError;
             string message = errorCode switch
@@ -1178,11 +1184,211 @@ public partial class MainWindow : Window
 
     private async void TxtStartupDelay_LostFocus(object sender, RoutedEventArgs e)
     {
+        await CommitStartupDelayAsync();
+    }
+
+    private async Task CommitStartupDelayAsync()
+    {
         if (!int.TryParse(TxtStartupDelay.Text.Trim(), out int sec))
             sec = 0;
         sec = Math.Clamp(sec, 0, 120);
         TxtStartupDelay.Text = sec.ToString();
         await _controller.SetStartupDelayAsync(sec);
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyResponsiveLayout(e.NewSize.Width < NarrowBreakpoint);
+    }
+
+    private void ApplyResponsiveLayout(bool narrow)
+    {
+        if (_layoutInitialized && _isNarrowLayout == narrow)
+            return;
+
+        _layoutInitialized = true;
+        _isNarrowLayout = narrow;
+
+        bool globalKeyFocused = TxtGlobalKey.IsKeyboardFocusWithin;
+        bool globalPanelFocused = GlobalHotkeyPanel.IsKeyboardFocusWithin;
+        bool settingsBtnFocused = BtnSettings.IsKeyboardFocusWithin;
+        bool settingsOverlayOpen = SettingsOverlay.Visibility == Visibility.Visible;
+
+        if (narrow)
+        {
+            SidebarColumn.Width = new GridLength(0);
+            SidebarBorder.Visibility = Visibility.Collapsed;
+            NarrowTopBar.Visibility = Visibility.Visible;
+            MainAreaGrid.Margin = new Thickness(12, 10, 12, 10);
+
+            MovePanel(StatusBadgePanel, NarrowStatusHost);
+            MovePanel(FeatureTogglesPanel, NarrowTogglesHost);
+            FeatureTogglesPanel.Orientation = System.Windows.Controls.Orientation.Horizontal;
+            HotkeyToggleRow.Margin = new Thickness(0, 0, 10, 0);
+            HotkeyToggleLabel.SetResourceReference(TextBlock.TextProperty, "Features_Hotkeys_Short");
+            HotkeyToggleLabel.Margin = new Thickness(0, 0, 5, 0);
+            PinToggleLabel.SetResourceReference(TextBlock.TextProperty, "Features_Pin_Short");
+            PinToggleLabel.Margin = new Thickness(0, 0, 5, 0);
+
+            MovePanel(ActionsPanel, NarrowActionsHost);
+            ActionsPanel.Orientation = System.Windows.Controls.Orientation.Horizontal;
+            BtnPinSettings.Height = 28;
+            BtnPinSettings.Padding = new Thickness(10, 2, 10, 2);
+            BtnPinSettings.Margin = new Thickness(0, 0, 6, 0);
+            BtnSettings.Height = 28;
+            BtnSettings.Padding = new Thickness(10, 2, 10, 2);
+
+            MovePanel(GlobalHotkeyPanel, SettingsGlobalHotkeyHost);
+            SettingsGlobalHotkeySection.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SidebarColumn.Width = new GridLength(216);
+            SidebarBorder.Visibility = Visibility.Visible;
+            NarrowTopBar.Visibility = Visibility.Collapsed;
+            MainAreaGrid.Margin = new Thickness(18, 14, 18, 12);
+
+            MovePanel(StatusBadgePanel, SidebarStatusHost);
+            MovePanel(FeatureTogglesPanel, SidebarTogglesHost);
+            FeatureTogglesPanel.Orientation = System.Windows.Controls.Orientation.Vertical;
+            HotkeyToggleRow.Margin = new Thickness(0, 0, 0, 8);
+            HotkeyToggleLabel.SetResourceReference(TextBlock.TextProperty, "Features_Hotkeys_Label");
+            HotkeyToggleLabel.Margin = new Thickness(0, 0, 8, 0);
+            PinToggleLabel.SetResourceReference(TextBlock.TextProperty, "Features_Pin_Label");
+            PinToggleLabel.Margin = new Thickness(0, 0, 8, 0);
+
+            MovePanel(ActionsPanel, SidebarActionsHost);
+            ActionsPanel.Orientation = System.Windows.Controls.Orientation.Vertical;
+            BtnPinSettings.Height = 34;
+            BtnPinSettings.Padding = new Thickness(14, 6, 14, 6);
+            BtnPinSettings.Margin = new Thickness(0, 0, 0, 8);
+            BtnSettings.Height = 34;
+            BtnSettings.Padding = new Thickness(14, 6, 14, 6);
+
+            SettingsGlobalHotkeySection.Visibility = Visibility.Collapsed;
+            MovePanel(GlobalHotkeyPanel, SidebarGlobalHotkeyHost);
+        }
+
+        if (settingsOverlayOpen && !narrow && globalPanelFocused)
+        {
+            BtnCloseSettings.Focus();
+            Keyboard.Focus(BtnCloseSettings);
+        }
+        else if (globalKeyFocused && (!narrow || settingsOverlayOpen))
+        {
+            TxtGlobalKey.Focus();
+        }
+        else if (settingsBtnFocused && BtnSettings.IsVisible && !settingsOverlayOpen)
+        {
+            BtnSettings.Focus();
+        }
+    }
+
+    private static void MovePanel(FrameworkElement element, System.Windows.Controls.Panel targetHost)
+    {
+        if (element.Parent is System.Windows.Controls.Panel currentParent)
+        {
+            if (ReferenceEquals(currentParent, targetHost))
+                return;
+            currentParent.Children.Remove(element);
+        }
+        if (!targetHost.Children.Contains(element))
+            targetHost.Children.Add(element);
+    }
+
+    private void BtnSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (SettingsOverlay.Visibility == Visibility.Visible)
+            CloseSettingsOverlay();
+        else
+            OpenSettingsOverlay();
+    }
+
+    private void BtnCloseSettings_Click(object sender, RoutedEventArgs e) => CloseSettingsOverlay();
+
+    private void SettingsBackdrop_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        CloseSettingsOverlay();
+        e.Handled = true;
+    }
+
+    private void OpenSettingsOverlay()
+    {
+        if (SettingsOverlay.Visibility == Visibility.Visible)
+            return;
+
+        var focused = Keyboard.FocusedElement;
+        if (focused is DependencyObject dep && IsDescendantOf(dep, SettingsOverlay))
+            focused = null;
+        _settingsReturnFocus = focused ?? BtnSettings;
+
+        SettingsOverlay.Visibility = Visibility.Visible;
+        SettingsOverlay.UpdateLayout();
+        BtnCloseSettings.Focus();
+        Keyboard.Focus(BtnCloseSettings);
+    }
+
+    private void CloseSettingsOverlay()
+    {
+        if (SettingsOverlay.Visibility != Visibility.Visible)
+            return;
+
+        if (CboLanguage.IsDropDownOpen)
+            CboLanguage.IsDropDownOpen = false;
+
+        if (TxtStartupDelay.IsKeyboardFocusWithin)
+            _ = CommitStartupDelayAsync();
+
+        SettingsOverlay.Visibility = Visibility.Collapsed;
+        SettingsOverlay.UpdateLayout();
+
+        IInputElement? target = _settingsReturnFocus;
+        _settingsReturnFocus = null;
+
+        if (!CanRestoreFocus(target))
+            target = CanRestoreFocus(BtnSettings) ? BtnSettings : LvShortcuts;
+
+        if (target != null)
+            Keyboard.Focus(target);
+    }
+
+    private static bool CanRestoreFocus(IInputElement? element)
+    {
+        if (element is UIElement ui)
+            return ui.IsVisible && ui.IsEnabled && ui.Focusable;
+        if (element is ContentElement ce)
+            return ce.IsEnabled && ce.Focusable;
+        return false;
+    }
+
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (SettingsOverlay.Visibility != Visibility.Visible)
+            return;
+
+        if (e.Key == Key.Escape)
+        {
+            if (CboLanguage.IsDropDownOpen)
+            {
+                CboLanguage.IsDropDownOpen = false;
+                e.Handled = true;
+                return;
+            }
+            CloseSettingsOverlay();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Tab)
+        {
+            var focused = Keyboard.FocusedElement as DependencyObject;
+            if (!IsDescendantOf(focused, SettingsPanelCard) && !CboLanguage.IsKeyboardFocusWithin)
+            {
+                BtnCloseSettings.Focus();
+                Keyboard.Focus(BtnCloseSettings);
+                e.Handled = true;
+            }
+        }
     }
 
 
@@ -1191,13 +1397,17 @@ public partial class MainWindow : Window
     /// </summary>
     private void RootGrid_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        // 如果当前不处于编辑模式，不处理
-        if (_editingIndex < 0) return;
+        // 如果设置覆盖面板已打开或当前不处于编辑模式，不取消正在录入/编辑的热键
+        if (_editingIndex < 0 || SettingsOverlay.Visibility == Visibility.Visible) return;
 
         var source = e.OriginalSource as System.Windows.DependencyObject;
 
-        // 1. 如果点击发生在"添加快捷键"卡片内部（包含输入框、按钮、下拉框等所有子元素），不取消
-        if (IsDescendantOf(source, AddCardBorder)) return;
+        // 1. 如果点击发生在"添加快捷键"卡片、设置覆盖面板或入口按钮内部，不取消
+        if (IsDescendantOf(source, AddCardBorder)
+            || IsDescendantOf(source, SettingsOverlay)
+            || IsDescendantOf(source, BtnSettings)
+            || IsDescendantOf(source, BtnPinSettings))
+            return;
 
         // 2. 如果点击发生在 ComboBox 的下拉项（位于独立的 Popup 可视树中），不取消
         if (source is System.Windows.Controls.ComboBoxItem) return;
@@ -1311,8 +1521,11 @@ public partial class MainWindow : Window
                 ChkMcpAllowWrites.IsChecked = settings.McpAllowWrites;
                 ChkMcpAllowExecute.IsChecked = settings.McpAllowExecute;
                 TxtMcpToken.Text = settings.McpToken;
+                CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
                 _suppressToggleSync = false;
                 _mcpPipeServer.SetEnabled(settings.McpEnabled);
+                _themeService.Apply(settings.Theme != "Light");
+                _languageService.Apply(settings.Language);
                 UpdateStatusUi();
                 _foregroundMonitor?.TriggerCurrent();
 
@@ -1530,16 +1743,26 @@ public partial class MainWindow : Window
     }
     private void CaptureModifierKey(System.Windows.Input.KeyEventArgs e, System.Windows.Controls.TextBox target)
     {
-        if (e.Key == Key.Escape)
+        Key actualKey = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (actualKey == Key.Tab
+            && (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Shift))
+            return;
+
+        if (actualKey == Key.Escape)
         {
-            if (_editingIndex >= 0) BtnCancelEdit_Click(null!, null!);
+            if (SettingsOverlay.Visibility != Visibility.Visible
+                && ReferenceEquals(target, TxtLocalKey)
+                && _editingIndex >= 0)
+            {
+                BtnCancelEdit_Click(null!, null!);
+            }
             return;
         }
         // Bug 8: 过滤纯修饰键，防止生成 "Ctrl+LeftCtrl" 之类的无效热键
-        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
-            e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
-            e.Key == Key.LeftShift || e.Key == Key.RightShift ||
-            e.Key == Key.LWin || e.Key == Key.RWin)
+        if (actualKey == Key.LeftCtrl || actualKey == Key.RightCtrl ||
+            actualKey == Key.LeftAlt || actualKey == Key.RightAlt ||
+            actualKey == Key.LeftShift || actualKey == Key.RightShift ||
+            actualKey == Key.LWin || actualKey == Key.RWin)
             return;
         // 必须至少有一个修饰键
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control) &&
@@ -1548,7 +1771,7 @@ public partial class MainWindow : Window
             !Keyboard.Modifiers.HasFlag(ModifierKeys.Windows))
             return;
         // Bug 8: 修复数字键显示（D1→1, NumPad1→1）
-        string keyStr = e.Key switch
+        string keyStr = actualKey switch
         {
             Key.D0 => "0", Key.D1 => "1", Key.D2 => "2", Key.D3 => "3", Key.D4 => "4",
             Key.D5 => "5", Key.D6 => "6", Key.D7 => "7", Key.D8 => "8", Key.D9 => "9",
@@ -1560,7 +1783,7 @@ public partial class MainWindow : Window
             Key.OemSemicolon => ";", Key.OemQuotes => "'",
             Key.OemComma => ",", Key.OemPeriod => ".", Key.OemQuestion => "/",
             Key.OemBackslash => "\\", Key.OemPipe => "|",
-            _ => e.Key.ToString()
+            _ => actualKey.ToString()
         };
         string hotkey = "";
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) hotkey += "Ctrl+";
@@ -1664,6 +1887,11 @@ public partial class MainWindow : Window
     /// <summary>CommandBinding CanExecute：控制 Ctrl+Z 和按钮的启用状态</summary>
     private void OnUndoCanExecute(object sender, System.Windows.Input.CanExecuteRoutedEventArgs e)
     {
+        if (SettingsOverlay.Visibility == Visibility.Visible)
+        {
+            e.CanExecute = false;
+            return;
+        }
         // ✅ TextBox 焦点劫持防御：让 TextBox 自己处理撤销（撤销输入字符）
         if (Keyboard.FocusedElement is System.Windows.Controls.TextBox)
         {
@@ -1675,6 +1903,8 @@ public partial class MainWindow : Window
     /// <summary>CommandBinding Executed：Ctrl+Z 触发</summary>
     private void OnUndoExecuted(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
     {
+        if (SettingsOverlay.Visibility == Visibility.Visible)
+            return;
         DoUndo();
     }
     /// <summary>撤销按钮点击</summary>
@@ -1749,6 +1979,62 @@ public sealed class ShortcutTypeToDisplayConverter : System.Windows.Data.IValueC
             return localized;
 
         return type;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+public sealed class ShortcutTargetNameConverter : System.Windows.Data.IValueConverter
+{
+    internal static string GetDisplayName(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return string.Empty;
+
+        string trimmed = target.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            && !string.IsNullOrEmpty(uri.Host))
+        {
+            return uri.Host;
+        }
+
+        string pathNoTrailing = trimmed.TrimEnd('\\', '/');
+        if (string.IsNullOrEmpty(pathNoTrailing) || (pathNoTrailing.Length == 2 && pathNoTrailing[1] == ':'))
+            return trimmed;
+
+        try
+        {
+            string fileName = System.IO.Path.GetFileName(pathNoTrailing);
+            if (!string.IsNullOrEmpty(fileName))
+                return fileName;
+        }
+        catch
+        {
+        }
+
+        return trimmed;
+    }
+
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => GetDisplayName(value as string);
+
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+public sealed class ShortcutTargetDetailVisibilityConverter : System.Windows.Data.IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+    {
+        if (value is not string target || string.IsNullOrWhiteSpace(target))
+            return Visibility.Collapsed;
+
+        string displayName = ShortcutTargetNameConverter.GetDisplayName(target);
+        return string.Equals(displayName, target.Trim(), StringComparison.Ordinal)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)

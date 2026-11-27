@@ -23,17 +23,27 @@ jobs:
         run: |
           dotnet publish Vector.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 
-      - name: Package portable zip
+      - name: Publish framework-dependent light single file
+        shell: pwsh
+        run: |
+          dotnet publish Vector.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-light
+
+      - name: Package portable zips
         shell: pwsh
         run: |
           $ver = '${{ github.ref_name }}'.TrimStart('v')
-          Compress-Archive -Path publish/Vector.exe -DestinationPath "Vector-v$ver-win-x64.zip"
+          Compress-Archive -Path publish/Vector.exe -DestinationPath "Vector-v$ver-win-x64.zip" -Force
+          Compress-Archive -Path publish-light/Vector.exe -DestinationPath "Vector-v$ver-win-x64-light.zip" -Force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: Vector-v*-win-x64.zip
+          files: |
+            Vector-v*-win-x64.zip
+            Vector-v*-win-x64-light.zip
           body: |
-            免安装绿色版：下载 zip 解压后双击 Vector.exe 即可运行。
-            自包含 .NET 8 运行时，无需预装 .NET。仅支持 Windows x64。
-            配置与日志位于 %AppData%\Vector\。
+            仅支持 Windows x64，配置与日志位于 %AppData%\Vector\。
+
+            发布包说明（每包解压后仅包含单个 Vector.exe）：
+            - `Vector-${{ github.ref_name }}-win-x64.zip`（默认完整版 / self-contained）：自包含 .NET 8 运行时，无需预装 .NET，解压后双击 `Vector.exe` 即可运行。
+            - `Vector-${{ github.ref_name }}-win-x64-light.zip`（轻量版 / framework-dependent）：体积更小，需预先安装 **.NET 8 Desktop Runtime (x64)** 后方可运行 `Vector.exe`。

@@ -13,7 +13,7 @@
     <SolidColorBrush x:Key="PrimaryDarkBrush"       Color="#303F9F"/>
     <SolidColorBrush x:Key="TextBrush"               Color="#1E1E23"/>
     <SolidColorBrush x:Key="TextMutedBrush"         Color="#787887"/>
-    <SolidColorBrush x:Key="TextFaintBrush"         Color="#B4B4C0"/>
+    <SolidColorBrush x:Key="TextFaintBrush"         Color="#6E6E80"/>
     <SolidColorBrush x:Key="SuccessBrush"            Color="#22C55E"/>
     <SolidColorBrush x:Key="DangerBrush"             Color="#EF4444"/>
     <SolidColorBrush x:Key="AccentBrush"             Color="#3F51B5"/>
@@ -21,5 +21,6 @@
     <SolidColorBrush x:Key="ListEvenBrush"           Color="#F8F8FC"/>
     <SolidColorBrush x:Key="ListOddBrush"            Color="#F0F0F5"/>
     <SolidColorBrush x:Key="ListSelectedBrush"       Color="#E0E0EC"/>
+    <SolidColorBrush x:Key="OverlayBackdropBrush"    Color="#66181824"/>
 
 </ResourceDictionary>

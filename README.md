@@ -121,12 +121,29 @@ Vector/
 
 ## 四、构建与运行
 
+### 发布包说明（Windows x64）
+
+GitHub Releases 同时提供以下两种单文件便携包（每个压缩包内仅包含 `Vector.exe`，解压后直接运行；配置与日志位于 `%AppData%\Vector\`）：
+
+| 发布包 | 发布模式 | 运行环境要求 | 特点说明 |
+| --- | --- | --- | --- |
+| `Vector-v<version>-win-x64.zip` | **默认完整版**（`self-contained`，未压缩单文件） | 无需预装 .NET | 内置 .NET 8 运行时，开箱即用，体积较大 |
+| `Vector-v<version>-win-x64-light.zip` | **轻量版**（`framework-dependent` 单文件） | 需预先安装 **.NET 8 Desktop Runtime (x64)** | 依赖系统已安装的 .NET 8 桌面运行时，体积显著更小 |
+
+### 本地构建与发布命令
+
 ```powershell
 # 还原依赖并编译（Debug / Release）
 dotnet build -c Release
 
 # 运行（需 Windows，且首次建议以管理员身份获得完整热键穿透能力）
 dotnet run -c Release
+
+# 发布默认完整版单文件（self-contained，未压缩）→ 产物目录 publish/Vector.exe
+dotnet publish Vector.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+# 发布轻量版单文件（framework-dependent，需目标机器已安装 .NET 8 Desktop Runtime x64）→ 产物目录 publish-light/Vector.exe
+dotnet publish Vector.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-light
 ```
 
 > 依赖 nuget：`Microsoft.Extensions.DependencyInjection`、`Microsoft.Extensions.Hosting`、`System.Drawing.Common`。
