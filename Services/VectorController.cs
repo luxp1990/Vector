@@ -30,6 +30,7 @@ public sealed class VectorController : IVectorController, IDisposable
 
     public event EventHandler? ShortcutsChanged;
     public event EventHandler? ListeningChanged;
+    public event EventHandler<ImportSettingsResult>? SettingsImported;
     public event Action<string, string, int?>? ExecuteFailed;
 
     public VectorController(
@@ -383,6 +384,9 @@ public sealed class VectorController : IVectorController, IDisposable
         _hotkeyService.UnregisterPinHotkeys();
         _hotkeyService.UnregisterPinToggleHotkey();
 
+        if (string.Equals(imported.McpToken, "***", StringComparison.Ordinal))
+            imported.McpToken = _settings.McpToken;
+
         _settings = imported;
         _settings.LocalShortcuts ??= new ObservableCollection<ShortcutConfig>();
         _settings.Pin ??= new PinSettings();
@@ -410,13 +414,15 @@ public sealed class VectorController : IVectorController, IDisposable
 
         await _settingsService.SaveAsync(_settings, ct);
         _undoService.Clear();
-        ShortcutsChanged?.Invoke(this, EventArgs.Empty);
-        ListeningChanged?.Invoke(this, EventArgs.Empty);
-
-        return new ImportSettingsResult(
+        var result = new ImportSettingsResult(
             true,
             GlobalHotkeyFail: globalHotkeyFail,
             FailedLocalKeys: failedKeys);
+        ShortcutsChanged?.Invoke(this, EventArgs.Empty);
+        ListeningChanged?.Invoke(this, EventArgs.Empty);
+        SettingsImported?.Invoke(this, result);
+
+        return result;
     }
 
     public async Task ExportToFileAsync(string filePath, CancellationToken ct = default)

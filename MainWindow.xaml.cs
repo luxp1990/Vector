@@ -33,6 +33,8 @@ public partial class MainWindow : Window
     private bool _isPinActive = true;
     private bool _pinPausedByGlobal;
     private bool _suppressToggleSync = false;      // 程序性同步开关状态时抑制事件
+    private bool _lastImportPinHotkeyFail = false;
+    private bool _lastImportPinToggleFail = false;
     private bool _reallyExit = false;                   // Bug 11: 退出标志位
     private bool _hasShownMinimizeTip = false;          // Bug N4: 气泡只弹一次
     private bool _trayCheckSuppress = false;            // 托盘勾选项回写时避免递归
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
         _languageService.LanguageChanged += OnLanguageChanged;
         _controller.ShortcutsChanged += OnControllerShortcutsChanged;
         _controller.ListeningChanged += OnControllerListeningChanged;
+        _controller.SettingsImported += OnControllerSettingsImported;
         UpdateUndoButtonState();
         var cm = new System.Windows.Controls.ContextMenu
         {
@@ -162,6 +165,58 @@ public partial class MainWindow : Window
             Sync();
         else
             Dispatcher.BeginInvoke(new Action(Sync));
+    }
+
+    private void OnControllerSettingsImported(object? sender, ImportSettingsResult e)
+    {
+        if (Dispatcher == null || Dispatcher.HasShutdownStarted) return;
+        bool globalHotkeyFailed = e.GlobalHotkeyFail != null;
+        if (Dispatcher.CheckAccess())
+            SyncImportedSettingsToUi(globalHotkeyFailed);
+        else
+            Dispatcher.BeginInvoke(new Action(() => SyncImportedSettingsToUi(globalHotkeyFailed)));
+    }
+
+    private void SyncImportedSettingsToUi(bool globalHotkeyFailed)
+    {
+        // Bug 18: 先清除选中状态，避免引用断裂
+        LvShortcuts.SelectedIndex = -1;
+        // 导入会整体替换列表：残留的编辑索引会指向新列表的错误项（甚至越界），先退出编辑模式
+        if (_editingIndex >= 0) BtnCancelEdit_Click(null!, null!);
+
+        var settings = _controller.Settings;
+        _pinPausedByGlobal = false;
+        _isPinActive = settings.Pin.Enabled;
+        _lastImportPinHotkeyFail = _isPinActive
+            && !_hotkeyService.RegisterPinHotkeys(
+                settings.Pin.SnapshotHotkey,
+                settings.Pin.ClipboardHotkey);
+        _lastImportPinToggleFail = !_hotkeyService.RegisterPinToggleHotkey(settings.Pin.ToggleHotkey);
+        _pinFeatureService.UpdateSettings(settings.Pin);
+        _pinFeatureService.SetEnabled(_isPinActive);
+
+        _suppressToggleSync = true;
+        TglHotkeys.IsChecked = _controller.IsListening;
+        TglPin.IsChecked = settings.Pin.Enabled;
+        ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
+        ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
+        ChkMcpEnabled.IsChecked = settings.McpEnabled;
+        ChkMcpAllowWrites.IsChecked = settings.McpAllowWrites;
+        ChkMcpAllowExecute.IsChecked = settings.McpAllowExecute;
+        TxtMcpToken.Text = settings.McpToken;
+        CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        _suppressToggleSync = false;
+        _themeService.Apply(settings.Theme != "Light");
+        _languageService.Apply(settings.Language);
+        UpdateStatusUi();
+        _foregroundMonitor?.TriggerCurrent();
+
+        // Bug 18: 更新全局热键输入框（None → 空，勿假显示默认键）
+        TxtGlobalKey.Text = globalHotkeyFailed || settings.GlobalHotKey == "None" ? "" : settings.GlobalHotKey;
+        TxtStartupDelay.Text = Math.Clamp(settings.StartupDelaySeconds, 0, 120).ToString();
+
+        RefreshListView();
+        UpdateUndoButtonState();
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
@@ -278,6 +333,7 @@ public partial class MainWindow : Window
         _languageService.LanguageChanged -= OnLanguageChanged;
         _controller.ShortcutsChanged -= OnControllerShortcutsChanged;
         _controller.ListeningChanged -= OnControllerListeningChanged;
+        _controller.SettingsImported -= OnControllerSettingsImported;
         _hotkeyService.UnregisterAll();
         _hotkeyService.UnregisterPinHotkeys();
         _hotkeyService.UnregisterPinToggleHotkey();
@@ -1496,55 +1552,18 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                // Bug 18: 先清除选中状态，避免引用断裂
-                LvShortcuts.SelectedIndex = -1;
-                // 导入会整体替换列表：残留的编辑索引会指向新列表的错误项（甚至越界），先退出编辑模式
-                if (_editingIndex >= 0) BtnCancelEdit_Click(null!, null!);
-
-                var settings = _controller.Settings;
-                _pinPausedByGlobal = false;
-                _isPinActive = settings.Pin.Enabled;
-                bool pinHotkeyFail = _isPinActive
-                    && !_hotkeyService.RegisterPinHotkeys(
-                        settings.Pin.SnapshotHotkey,
-                        settings.Pin.ClipboardHotkey);
-                bool pinToggleFail = !_hotkeyService.RegisterPinToggleHotkey(settings.Pin.ToggleHotkey);
-                _pinFeatureService.UpdateSettings(settings.Pin);
-                _pinFeatureService.SetEnabled(_isPinActive);
-
-                _suppressToggleSync = true;
-                TglHotkeys.IsChecked = _controller.IsListening;
-                TglPin.IsChecked = settings.Pin.Enabled;
-                ChkHotkeyDiagnostics.IsChecked = settings.HotkeyDiagnosticsEnabled;
-                ChkHotkeyCoexistence.IsChecked = settings.Coexistence.Enabled;
-                ChkMcpEnabled.IsChecked = settings.McpEnabled;
-                ChkMcpAllowWrites.IsChecked = settings.McpAllowWrites;
-                ChkMcpAllowExecute.IsChecked = settings.McpAllowExecute;
-                TxtMcpToken.Text = settings.McpToken;
-                CboLanguage.SelectedIndex = string.Equals(settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-                _suppressToggleSync = false;
-                _mcpPipeServer.SetEnabled(settings.McpEnabled);
-                _themeService.Apply(settings.Theme != "Light");
-                _languageService.Apply(settings.Language);
-                UpdateStatusUi();
-                _foregroundMonitor?.TriggerCurrent();
-
-                // Bug 18: 更新全局热键输入框（None → 空，勿假显示默认键）
-                TxtGlobalKey.Text = result.GlobalHotkeyFail != null || settings.GlobalHotKey == "None" ? "" : settings.GlobalHotKey;
-                TxtStartupDelay.Text = Math.Clamp(settings.StartupDelaySeconds, 0, 120).ToString();
-
                 var failedKeys = result.FailedLocalKeys ?? Array.Empty<string>();
                 // ✅ 1.0.8: 合并为单一消息框，避免双重弹窗
-                if (failedKeys.Count > 0 || result.GlobalHotkeyFail != null || pinHotkeyFail || pinToggleFail)
+                if (failedKeys.Count > 0 || result.GlobalHotkeyFail != null || _lastImportPinHotkeyFail || _lastImportPinToggleFail)
                 {
                     var msg = _languageService.GetString("Msg_ImportPartialSuccess_Base");
                     if (failedKeys.Count > 0)
                         msg += _languageService.Format("Msg_ImportPartialSuccess_LocalFail_Format", string.Join("\n", failedKeys));
                     if (result.GlobalHotkeyFail != null)
                         msg += _languageService.Format("Msg_ImportPartialSuccess_GlobalFail_Format", result.GlobalHotkeyFail);
-                    if (pinHotkeyFail)
+                    if (_lastImportPinHotkeyFail)
                         msg += _languageService.GetString("Msg_ImportPartialSuccess_PinFail");
-                    if (pinToggleFail)
+                    if (_lastImportPinToggleFail)
                         msg += _languageService.GetString("Msg_ImportPartialSuccess_PinToggleFail");
                     System.Windows.MessageBox.Show(msg, _languageService.GetString("Msg_ImportPartialTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
@@ -1555,8 +1574,6 @@ public partial class MainWindow : Window
                         _languageService.GetString("Common_Info"),
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                RefreshListView();
-                UpdateUndoButtonState();
             }
             catch (Exception ex)
             {

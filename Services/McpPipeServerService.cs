@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
@@ -33,7 +34,9 @@ public sealed class McpPipeServerService : IMcpPipeServerService
     private readonly IVectorController _controller;
     private readonly ISettingsService _settingsService;
     private readonly object _lifecycleLock = new();
+    private readonly SemaphoreSlim _transitionGate = new(1, 1);
 
+    private Task _transitionQueue = Task.CompletedTask;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoopTask;
     private bool _disposed;
@@ -44,6 +47,7 @@ public sealed class McpPipeServerService : IMcpPipeServerService
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _controller.SettingsImported += OnControllerSettingsImported;
     }
 
     public bool IsRunning
@@ -67,63 +71,110 @@ public sealed class McpPipeServerService : IMcpPipeServerService
 
     public void Start()
     {
+        _ = EnqueueTransitionAsync(StartCoreAsync);
+    }
+
+    public Task StopAsync()
+    {
+        return EnqueueTransitionAsync(StopCoreAsync);
+    }
+
+    private Task EnqueueTransitionAsync(Func<Task> action)
+    {
         lock (_lifecycleLock)
         {
             if (_disposed)
-                return;
+                return Task.CompletedTask;
 
-            if (_cts != null && !_cts.IsCancellationRequested)
-                return;
-
-            _cts = new CancellationTokenSource();
-            var ct = _cts.Token;
-            _acceptLoopTask = Task.Run(() => AcceptLoopAsync(ct), CancellationToken.None);
+            _transitionQueue = _transitionQueue.ContinueWith(
+                _ => action(),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default).Unwrap();
+            return _transitionQueue;
         }
-
-        _ = _settingsService.LogAsync($"[MCP] Named pipe server started (pipe={PipeName})");
     }
 
-    public async Task StopAsync()
+    private async Task StartCoreAsync()
     {
-        CancellationTokenSource? cts;
-        Task? loopTask;
-
-        lock (_lifecycleLock)
-        {
-            cts = _cts;
-            loopTask = _acceptLoopTask;
-            _cts = null;
-            _acceptLoopTask = null;
-        }
-
-        if (cts == null)
-            return;
-
+        await _transitionGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            cts.Cancel();
-            if (loopTask != null)
+            lock (_lifecycleLock)
             {
-                try
-                {
-                    await loopTask.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                }
-                catch (Exception ex)
-                {
-                    await _settingsService.LogAsync($"[MCP] Stop accept loop error: {ex.GetType().Name}: {ex.Message}")
-                        .ConfigureAwait(false);
-                }
+                if (_disposed)
+                    return;
+
+                if (_cts != null && !_cts.IsCancellationRequested)
+                    return;
+
+                _cts = new CancellationTokenSource();
+                var ct = _cts.Token;
+                _acceptLoopTask = Task.Run(() => AcceptLoopAsync(ct), CancellationToken.None);
             }
+
+            await _settingsService.LogAsync($"[MCP] Named pipe server started (pipe={PipeName})").ConfigureAwait(false);
         }
         finally
         {
-            cts.Dispose();
+            _transitionGate.Release();
         }
+    }
 
-        await _settingsService.LogAsync("[MCP] Named pipe server stopped").ConfigureAwait(false);
+    private async Task StopCoreAsync()
+    {
+        await _transitionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            CancellationTokenSource? cts;
+            Task? loopTask;
+
+            lock (_lifecycleLock)
+            {
+                cts = _cts;
+                loopTask = _acceptLoopTask;
+                _cts = null;
+                _acceptLoopTask = null;
+            }
+
+            if (cts == null)
+                return;
+
+            try
+            {
+                try { cts.Cancel(); } catch (ObjectDisposedException) { }
+                if (loopTask != null)
+                {
+                    try
+                    {
+                        await loopTask.ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
+                        await _settingsService.LogAsync($"[MCP] Stop accept loop error: {ex.GetType().Name}: {ex.Message}")
+                            .ConfigureAwait(false);
+                    }
+                }
+            }
+            finally
+            {
+                cts.Dispose();
+            }
+
+            await _settingsService.LogAsync("[MCP] Named pipe server stopped").ConfigureAwait(false);
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
+    }
+
+    private void OnControllerSettingsImported(object? sender, ImportSettingsResult e)
+    {
+        SetEnabled(_controller.Settings.McpEnabled);
     }
 
     public void Dispose()
@@ -138,6 +189,8 @@ public sealed class McpPipeServerService : IMcpPipeServerService
             _cts = null;
             _acceptLoopTask = null;
         }
+
+        _controller.SettingsImported -= OnControllerSettingsImported;
 
         if (cts != null)
         {
@@ -528,7 +581,9 @@ public sealed class McpPipeServerService : IMcpPipeServerService
         await _settingsService.LogAsync("[MCP] Tool call: export_config", ct).ConfigureAwait(false);
         try
         {
-            return await InvokeOnUiThreadAsync(() => _controller.ExportToJson(), ct).ConfigureAwait(false);
+            return await InvokeOnUiThreadAsync(
+                () => MaskMcpTokenInConfigJson(_controller.ExportToJson()),
+                ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -537,6 +592,21 @@ public sealed class McpPipeServerService : IMcpPipeServerService
                 CancellationToken.None).ConfigureAwait(false);
             throw;
         }
+    }
+
+    internal static string MaskMcpTokenInConfigJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return json;
+
+        var node = JsonNode.Parse(json);
+        if (node is JsonObject obj && obj.ContainsKey(nameof(AppSettings.McpToken)))
+        {
+            obj[nameof(AppSettings.McpToken)] = "***";
+            return obj.ToJsonString(s_jsonOptions);
+        }
+
+        return json;
     }
 
     private void ValidateMcpAccess(string? providedToken, bool requireExecute = false)

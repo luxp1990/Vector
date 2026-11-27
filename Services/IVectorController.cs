@@ -38,6 +38,7 @@ public interface IVectorController
 
     event EventHandler? ShortcutsChanged;
     event EventHandler? ListeningChanged;
+    event EventHandler<ImportSettingsResult>? SettingsImported;
     event Action<string, string, int?>? ExecuteFailed;
 
     Task<IReadOnlyList<string>> LoadAsync(CancellationToken ct = default);

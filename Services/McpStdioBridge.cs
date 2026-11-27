@@ -64,7 +64,7 @@ public static class McpStdioBridge
         var stdinToPipe = PumpAsync(stdin, pipe, cts.Token);
         var pipeToStdout = PumpAsync(pipe, stdout, cts.Token);
 
-        await Task.WhenAny(stdinToPipe, pipeToStdout).ConfigureAwait(false);
+        var completed = await Task.WhenAny(stdinToPipe, pipeToStdout).ConfigureAwait(false);
         cts.Cancel();
 
         try
@@ -75,12 +75,27 @@ public static class McpStdioBridge
         {
         }
 
-        try
+        if (completed == stdinToPipe)
         {
-            await Task.WhenAll(stdinToPipe, pipeToStdout).ConfigureAwait(false);
+            try
+            {
+                await pipeToStdout.ConfigureAwait(false);
+            }
+            catch
+            {
+            }
         }
-        catch
+        else
         {
+            // Console.OpenStandardInput().ReadAsync does not honor CancellationToken on Windows;
+            // wait only a brief grace period so the bridge exits promptly when the pipe ends.
+            try
+            {
+                await Task.WhenAny(stdinToPipe, Task.Delay(100)).ConfigureAwait(false);
+            }
+            catch
+            {
+            }
         }
 
         return 0;
